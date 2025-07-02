@@ -1,714 +1,280 @@
-// src/main.cpp - Main Firmware
+// src/main.cpp - Main Firmware (LoRa P2P Wood Moisture Version)
 
 #include <Arduino.h>
-#include <lmic.h>
-#include <hal/hal.h>
 #include <SPI.h>
+#include <RadioLib.h>
 #include "config.h"
-#include <CayenneLPP.h>
+#include "wood_species_data.h"         // For species A, B coefficients
+#include "wood_temp_correction_data.h" // For temperature correction table
 
 #ifdef USE_AXP_POWER_MANAGEMENT
 #include <XPowersLib.h>
 XPowersLibInterface *PMU = NULL;
+bool pmic_initialized = false;
 #endif
 
+// ESP32 Internal Temperature Sensor (available in newer ESP32 Arduino cores)
+#ifdef __cplusplus
+extern "C" {
+#endif
+uint8_t temprature_sens_read(); // Function to read ESP32 internal temperature
+#ifdef __cplusplus
+}
+#endif
+
+// --- RadioLib Module Instance ---
+SX1262 radio = new Module(LORA_CS_PIN, LORA_DIO1_PIN, LORA_RST_PIN, LORA_BUSY_PIN, SPI);
+
+// --- RTC DATA FOR SLEEP ---
+RTC_DATA_ATTR uint32_t sleep_interval_seconds = P2P_SEND_INTERVAL_SECONDS;
+
 // --- FORWARD DECLARATIONS ---
-void do_send(osjob_t *j);
-void printHex2(unsigned v);
-void deep_sleep_with_timer(uint32_t seconds);
-void setup_lora_pins();
 void setup_axp();
-void power_down_peripheral(uint8_t peripheral_mask, const char* name);
-power_save_level_t disable_all_irrelevant_peripherals(void);
-void restore_all_irrelevant_peripherals(power_save_level_t level);
-
-// --- STATE MACHINE ---
-typedef enum {
-    STATE_INIT,
-    STATE_PMIC_SETUP,
-    STATE_LORA_INIT,
-    STATE_JOIN_LORAWAN,
-    STATE_IDLE, // Waiting for next measurement interval
-    STATE_POWER_UP_SENSOR,
-    STATE_READ_SENSOR,
-    STATE_PREPARE_TX_DATA,
-    STATE_TRANSMIT_DATA,
-    STATE_WAIT_FOR_TX_COMPLETE,
-    STATE_POWER_DOWN_SENSOR,
-    STATE_ENTER_SLEEP,
-    STATE_ERROR
-} device_state_t;
-
-RTC_DATA_ATTR device_state_t currentState = STATE_INIT;
-RTC_DATA_ATTR bool lorawan_joined = false;
-RTC_DATA_ATTR uint32_t current_interval_seconds = NORMAL_INTERVAL_SECONDS;
-RTC_DATA_ATTR uint8_t join_retry_count = 0;
-RTC_DATA_ATTR uint8_t tx_retry_count = 0;
-
-// --- LORAWAN & LMIC ---
-// LMIC job scheduling
-osjob_t sendjob;
-
-// LoRaWAN Pin mapping for MCCI LMIC and T-Beam SX1262
-// This is provided as a struct, and then lmic_pinmap is set to its address.
-const lmic_pinmap lmic_pins = {
-    .nss = LORA_CS_PIN, // NSS (SPI Chip Select)
-    .rxtx = LMIC_UNUSED_PIN, // For SX1276, set to 0 for auto, 1 for active high, 2 for active low. Not used for SX126x.
-    .rst = LORA_RST_PIN, // Reset
-    .dio = {LORA_DIO1_PIN, LORA_DIO1_PIN, LMIC_UNUSED_PIN}, // DIO0, DIO1, DIO2. For SX126x, DIO1 is used for IRQ.
-                                                        // Some SX126x boards might use DIO2 or DIO3 for specific events like TX_DONE, RX_DONE if configured.
-                                                        // MCCI LMIC with SX1262 primarily relies on DIO1.
-    .rxtx_rx_active = 0, // Not used for SX126x
-    .rssi_cal = 10,      // LBT channel calibration factor, adjust if needed
-    .spi_freq = 8000000, // SPI frequency, 8MHz is common for SX126x.
-                        // Check SX1262 datasheet for max SPI speed.
-    // Radio specific for SX126X
-    .busy = LORA_BUSY_PIN, // BUSY pin for SX1262
-    .tcxo_vcc_pin = LMIC_UNUSED_PIN, // If TCXO voltage is controlled by a GPIO
-    .board_power_pin = LMIC_UNUSED_PIN // If overall radio board power is controlled by a GPIO
-};
-
-// Buffer for CayenneLPP payload
-CayenneLPP lpp(51); // Max payload size for LoRaWAN is region-dependent, 51 is generally safe
-
-// --- SENSOR DATA ---
-RTC_DATA_ATTR float last_soil_moisture_percent = -1.0;
-RTC_DATA_ATTR float last_battery_voltage = -1.0;
-
-// --- FUNCTION PROTOTYPES (from LMIC library) ---
-// These are callbacks LMIC needs. User code needs to provide them.
-// Provide DEVEUI, APPEUI, and APPKEY for OTAA
-// These are defined in config.h
-void os_getArtEui(u1_t *buf) { memcpy_P(buf, APPEUI, 8); }
-void os_getDevEui(u1_t *buf) { memcpy_P(buf, DEVEUI, 8); }
-void os_getDevKey(u1_t *buf) { memcpy_P(buf, APPKEY, 16); }
+void deep_sleep_with_timer(uint32_t seconds);
+void print_wakeup_reason();
+float read_wood_resistance_ohms();
+float calculate_indicated_mc(float R_wood_ohms, const WoodSpecies& species);
+float read_esp_temperature_celsius();
+float get_temperature_correction(float indicated_mc, float wood_temp_celsius);
+float bilinear_interpolation(float x, float y, const float x_points[], int x_count, const float y_points[], int y_count, const float table[][MC_POINTS_COUNT]);
 
 // --- SETUP FUNCTION ---
 void setup() {
-    // ESP32 specific: Disable core 0 WDT if it causes issues during long LMIC operations or deep sleep.
-    // For robust applications, it'''s better to feed the WDT.
-    // disableCore0WDT(); // If needed, test thoroughly
-
-    // Initialize Serial for debugging
     Serial.begin(SERIAL_BAUD);
-    while (!Serial && millis() < 2000); // Wait for serial, but not indefinitely
+    while (!Serial && millis() < 2000);
+    DEBUG_PRINTLN(F("\nStarting ESP32 Wood Moisture Sensor (LoRa P2P Mode)..."));
 
-    DEBUG_PRINTLN(F("Starting ESP32 Soil Moisture Sensor..."));
-    DEBUG_PRINT(F("Current State: ")); DEBUG_PRINTLN(currentState);
-    DEBUG_PRINT(F("Wakeup reason: "));
-    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-    switch(wakeup_reason) {
-        case ESP_SLEEP_WAKEUP_EXT0 : DEBUG_PRINTLN(F("External signal using RTC_IO")); break;
-        case ESP_SLEEP_WAKEUP_EXT1 : DEBUG_PRINTLN(F("External signal using RTC_CNTL")); break;
-        case ESP_SLEEP_WAKEUP_TIMER : DEBUG_PRINTLN(F("Timer")); break;
-        case ESP_SLEEP_WAKEUP_TOUCHPAD : DEBUG_PRINTLN(F("Touchpad")); break;
-        case ESP_SLEEP_WAKEUP_ULP : DEBUG_PRINTLN(F("ULP program")); break;
-        default : DEBUG_PRINT(F("Other (")); DEBUG_PRINT(wakeup_reason); DEBUG_PRINTLN(F(")"));break;
-    }
+    print_wakeup_reason();
 
-    if (currentState == STATE_INIT || wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED || wakeup_reason == 0) { // ESP_SLEEP_WAKEUP_UNDEFINED is 0, first boot
-        DEBUG_PRINTLN(F("Device cold boot or reset. Initializing..."));
-        lorawan_joined = false;
-        join_retry_count = 0;
-        tx_retry_count = 0;
-        current_interval_seconds = NORMAL_INTERVAL_SECONDS;
-        last_soil_moisture_percent = -1.0; // Indicate no valid reading yet
-        last_battery_voltage = -1.0;
-        currentState = STATE_PMIC_SETUP;
-    } else {
-        DEBUG_PRINTLN(F("Woke from sleep. Continuing state machine."));
-        // State is already restored from RTC memory
-    }
-
-    // Setup sensor power pin
-    pinMode(SOIL_MOISTURE_POWER_PIN, OUTPUT);
-    digitalWrite(SOIL_MOISTURE_POWER_PIN, LOW); // Ensure sensor is off initially
-
-    // ADC Configuration for soil moisture sensor
-    // ESP32 ADC can be noisy. Consider using adc_power_acquire() and release() for better readings if needed.
-    // For this example, a simple analogRead is used.
-    // You might want to set ADC attenuation for full 0-3.3V range if your sensor outputs that.
-    // e.g. analogSetCycles(32); analogSetSamples(1); analogSetClockDiv(1);
-    // analogSetPinAttenuation(SOIL_MOISTURE_ADC_PIN, ADC_11db); // For 0-3.3V range
-    // Default is ADC_0db (0-1.1V approximately). Check ESP32 ADC docs for your specific setup.
-
-    // Print LoRaWAN keys (first few bytes for verification, not full keys for security)
-    DEBUG_PRINT(F("DevEUI: ")); for(int i=0; i<2; ++i) { printHex2(DEVEUI[i]); DEBUG_PRINT(F(" "));} DEBUG_PRINTLN(F("..."));
-    DEBUG_PRINT(F("AppEUI: ")); for(int i=0; i<2; ++i) { printHex2(APPEUI[i]); DEBUG_PRINT(F(" "));} DEBUG_PRINTLN(F("..."));
-    DEBUG_PRINT(F("AppKey: ")); for(int i=0; i<2; ++i) { printHex2(APPKEY[i]); DEBUG_PRINT(F(" "));} DEBUG_PRINTLN(F("..."));
-
-    // The state machine will handle PMIC and LoRa init from loop()
-}
-
-// --- LOOP FUNCTION (STATE MACHINE) ---
-void loop() {
-    switch (currentState) {
-        case STATE_INIT:
-            // This state should ideally be handled fully in setup after a cold boot.
-            // If we somehow re-enter STATE_INIT, re-initialize and move to PMIC setup.
-            DEBUG_PRINTLN(F("[State] INIT: Re-initializing critical variables."));
-            lorawan_joined = false;
-            join_retry_count = 0;
-            tx_retry_count = 0;
-            current_interval_seconds = NORMAL_INTERVAL_SECONDS;
-            currentState = STATE_PMIC_SETUP;
-            break;
-
-        case STATE_PMIC_SETUP:
-            DEBUG_PRINTLN(F("[State] PMIC_SETUP"));
-            setup_axp(); // Initialize AXP Power Management
-            currentState = STATE_LORA_INIT;
-            break;
-
-        case STATE_LORA_INIT:
-            DEBUG_PRINTLN(F("[State] LORA_INIT"));
-            #ifdef USE_AXP_POWER_MANAGEMENT
-            if (PMU) {
-                // Example: Enable LoRa power rail if controlled by AXP
-                // This depends on your T-Beam version and AXP configuration.
-                // For many T-Beams, LoRa power (LDO3 or similar) is enabled by default
-                // or tied to ESP32'''s 3.3V rail. Check your schematic.
-                // PMU->enableControl(XPOWERS_LDO3); // Or whichever rail powers LoRa
-                DEBUG_PRINTLN(F("PMIC: Ensuring LoRa power rail is on (if applicable)."));
-            }
-            #endif
-            setup_lora_pins(); // Configure GPIOs for LoRa module
-            os_init();         // Initialize LMIC runtime environment
-            LMIC_reset();      // Reset LoRaWAN state
-
-            // Set LoRaWAN region. LMIC_setupChannel is used for US/AU style bands.
-            // For EU433 (or EU868), LMIC configures channels based on compile-time settings.
-            // The CFG_eu433 flag in platformio.ini and lmic_project_config.h handles this.
-            #if defined(CFG_eu433)
-                DEBUG_PRINTLN(F("LMIC: Configuring for EU433."));
-                // LMIC_setupChannel(0, 433175000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI); // Example for a specific channel
-                // For EU433, often a set of default channels are enabled by the library core based on region definition.
-                // Make sure lmic_project_config.h and platformio.ini define CFG_eu433.
-            #elif defined(CFG_us915)
-                DEBUG_PRINTLN(F("LMIC: Configuring for US915."));
-                LMIC_selectSubBand(1); // Example: select sub-band 1 for US915 (0-7)
-            #elif defined(CFG_au915)
-                DEBUG_PRINTLN(F("LMIC: Configuring for AU915."));
-                LMIC_selectSubBand(1); // Example: select sub-band 1 for AU915 (0-7)
-            #elif defined(CFG_eu868)
-                DEBUG_PRINTLN(F("LMIC: Configuring for EU868."));
-                // Default channels usually fine for EU868
-            #else
-                #warning "LoRaWAN region not explicitly configured in main.cpp, relying on LMIC defaults / platformio.ini"
-            #endif
-
-            // Set data rate and transmit power (optional, LMIC defaults are usually fine)
-            // LMIC_setDrTxpow(DR_SF7, 14); // Example: SF7, 14 dBm
-
-            // Set clock error for better LoRaWAN timing, especially if using a TCXO
-            // LMIC_setClockError(MAX_CLOCK_ERROR_M_PPM * 1 / 100); // 1% for crystal
-            // LMIC_setClockError(MAX_CLOCK_ERROR_M_PPM * 0.02 / 100); // 0.02% for a good TCXO (20ppm)
-            LMIC_setClockError(20); // MCCI LMIC expects PPM * 1000000 / 2^20, so 20ppm is approx 20. 
-                                    // Or use MAX_CLOCK_ERROR_PPM for older LMIC.
-                                    // Or better: LMIC_setClockError(MAX_CLOCK_ERROR_M_PPM * TCXO_ACCURACY_PPM / 100.0) 
-                                    // For T-BEAM SX1262, TCXO is common. Let'''s assume 5ppm for TCXO.
-            LMIC_setClockError(MAX_CLOCK_ERROR_M_PPM * 5 / 100); 
-
-            if (lorawan_joined) {
-                LMIC_setSession (0x1, LMIC.devaddr, (u1_t*)LMIC.nwkKey, (u1_t*)LMIC.artKey);
-                DEBUG_PRINTLN(F("LMIC: Session restored. Device Address: "));
-                printHex2(LMIC.devaddr >> 24);
-                printHex2(LMIC.devaddr >> 16);
-                printHex2(LMIC.devaddr >> 8);
-                printHex2(LMIC.devaddr & 0xFF);
-                Serial.println();
-                currentState = STATE_IDLE; // Proceed to idle if already joined
-            } else {
-                currentState = STATE_JOIN_LORAWAN;
-            }
-            break;
-
-        case STATE_JOIN_LORAWAN:
-            DEBUG_PRINTLN(F("[State] JOIN_LORAWAN"));
-            if (join_retry_count < LORAWAN_JOIN_MAX_RETRIES) {
-                DEBUG_PRINT(F("Attempting LoRaWAN join (Attempt: "));
-                DEBUG_PRINT(join_retry_count + 1); DEBUG_PRINTLN(F(")"));
-                LMIC_startJoining();
-                // The EV_JOINED or EV_JOIN_FAILED event will update state in onEvent()
-                // For now, we stay in this state, os_runloop will handle LMIC events.
-            } else {
-                DEBUG_PRINTLN(F("Max join retries reached. Sleeping before next attempt cycle."));
-                currentState = STATE_ENTER_SLEEP; // Sleep for a longer duration
-                current_interval_seconds = LORAWAN_JOIN_RETRY_SLEEP_SECONDS * 5; // Longer sleep if all retries fail
-            }
-            break;
-
-        case STATE_IDLE:
-            DEBUG_PRINTLN(F("[State] IDLE"));
-            // This state is effectively a wait before the next sensor reading.
-            // The actual sleep will happen in STATE_ENTER_SLEEP.
-            // We transition directly to powering up the sensor if interval has passed (handled by deep sleep timer).
-            currentState = STATE_POWER_UP_SENSOR;
-            break;
-
-        case STATE_POWER_UP_SENSOR:
-            DEBUG_PRINTLN(F("[State] POWER_UP_SENSOR"));
-            digitalWrite(SOIL_MOISTURE_POWER_PIN, HIGH);
-            delay(ADC_READ_STABILIZATION_MS); // Allow sensor to stabilize
-            currentState = STATE_READ_SENSOR;
-            break;
-
-        case STATE_READ_SENSOR:
-            DEBUG_PRINTLN(F("[State] READ_SENSOR"));
-            {
-                uint32_t adc_raw = analogRead(SOIL_MOISTURE_ADC_PIN);
-                DEBUG_PRINT(F("Raw ADC value: ")); DEBUG_PRINTLN(adc_raw);
-
-                // Map ADC raw value to percentage
-                // Ensure ADC_RAW_WET is not equal to ADC_RAW_DRY to avoid division by zero.
-                if (ADC_RAW_WET == ADC_RAW_DRY) {
-                    DEBUG_PRINTLN(F("ERROR: ADC_RAW_WET and ADC_RAW_DRY are the same. Cannot calculate percentage."));
-                    last_soil_moisture_percent = -1; // Indicate error
-                } else {
-                    // Ensure ADC values are properly clamped for mapping.
-                    // Soil moisture is typically inverse to ADC reading (wetter = lower resistance = higher ADC value if pull-up is on ADC side)
-                    // OR (wetter = lower resistance = lower ADC value if sensor forms voltage divider to GND and ADC reads midpoint)
-                    // Assuming sensor to GND, and GPIO powers a pull-up resistor to 3.3V, and ADC reads the junction.
-                    // So, WET = higher voltage/ADC reading, DRY = lower voltage/ADC reading.
-                    // If your sensor is opposite (e.g. resistive sensor to VCC, and ADC measures voltage drop over a fixed resistor to GND)
-                    // then swap ADC_RAW_DRY and ADC_RAW_WET in the map function.
-                    // The provided config expects DRY = 0, WET = 4095 (typical for ESP32 12-bit ADC).
-                    long mapped_value = map(adc_raw, ADC_RAW_DRY, ADC_RAW_WET, 0, 100);
-                    last_soil_moisture_percent = constrain(mapped_value, 0, 100); // Constrain to 0-100%
-                }
-                DEBUG_PRINT(F("Soil Moisture: ")); DEBUG_PRINT(last_soil_moisture_percent); DEBUG_PRINTLN(F(" %"));
-
-                // Interval is now fixed to NORMAL_INTERVAL_SECONDS by default.
-                // ALERT_INTERVAL_SECONDS can be set via other means (e.g. downlink) if implemented later.
-                current_interval_seconds = NORMAL_INTERVAL_SECONDS;
-                DEBUG_PRINT(F("Using interval: ")); DEBUG_PRINT(current_interval_seconds); DEBUG_PRINTLN(F(" seconds."));
-            }
-            currentState = STATE_PREPARE_TX_DATA;
-            break;
-
-        case STATE_PREPARE_TX_DATA:
-            DEBUG_PRINTLN(F("[State] PREPARE_TX_DATA"));
-            lpp.reset();
-            if (last_soil_moisture_percent != -1) {
-                lpp.addAnalogInput(LPP_CHANNEL_MOISTURE, last_soil_moisture_percent); // Cayenne LPP expects float for analog input
-            }
-
-            #ifdef USE_AXP_POWER_MANAGEMENT
-            if (PMU) {
-                // It'''s good practice to check if PMU init was successful
-                last_battery_voltage = PMU->getBattVoltage() / 1000.0f; // Voltage in mV, convert to V
-                if (last_battery_voltage > 0) { // Basic check for valid reading
-                    lpp.addAnalogInput(LPP_CHANNEL_BATTERY_VOLTAGE, last_battery_voltage);
-                    DEBUG_PRINT(F("Battery Voltage: ")); DEBUG_PRINT(last_battery_voltage); DEBUG_PRINTLN(F(" V"));
-                }
-            }
-            #endif
-            // Optionally add RSSI and SNR if available and meaningful before TX
-            // lpp.addAnalogInput(LPP_CHANNEL_RSSI, LMIC.rssi);
-            // lpp.addAnalogInput(LPP_CHANNEL_SNR, LMIC.snr / 4.0); // SNR is reported as value * 4
-
-            if (lpp.getSize() == 0) {
-                DEBUG_PRINTLN(F("No data to send. Skipping transmission."));
-                currentState = STATE_POWER_DOWN_SENSOR;
-            } else {
-                currentState = STATE_TRANSMIT_DATA;
-            }
-            break;
-
-        case STATE_TRANSMIT_DATA:
-            DEBUG_PRINTLN(F("[State] TRANSMIT_DATA"));
-            if (LMIC.opmode & OP_TXRXPEND) {
-                DEBUG_PRINTLN(F("LoRaWAN busy (OP_TXRXPEND). Waiting..."));
-                // Stay in this state, os_runloop will eventually clear OP_TXRXPEND
-            } else if (!lorawan_joined) {
-                DEBUG_PRINTLN(F("Not joined to LoRaWAN. Cannot transmit. Returning to JOIN state."));
-                currentState = STATE_LORA_INIT; // Re-initialize and try joining again
-                join_retry_count = 0; // Reset join retries for a fresh attempt cycle
-            } else {
-                // Prepare upstream data transmission at the next possible time.
-                DEBUG_PRINT(F("Preparing to send LoRaWAN packet. Size: ")); DEBUG_PRINTLN(lpp.getSize());
-                // LMIC_setTxData2(port, data, dataLen, confirmed)
-                // Port 1-223. Confirmed (1) or unconfirmed (0) message.
-                // For sensor data, unconfirmed is usually preferred for battery life and network load.
-                LMIC_setTxData2(1, lpp.getBuffer(), lpp.getSize(), 0); // Port 1, unconfirmed
-                DEBUG_PRINTLN(F("Packet queued for transmission."));
-                currentState = STATE_WAIT_FOR_TX_COMPLETE;
-                tx_retry_count = 0; // Reset tx retry for this new packet
-            }
-            break;
-
-        case STATE_WAIT_FOR_TX_COMPLETE:
-            // DEBUG_PRINTLN(F("[State] WAIT_FOR_TX_COMPLETE"));
-            // LMIC handles transmission in the background via os_runloop().
-            // The onEvent() callback (specifically EV_TXCOMPLETE) will change the state.
-            // If TX fails multiple times (handled in onEvent), we might re-try or go to sleep.
-            // Add a timeout here? If LMIC gets stuck, this state might persist.
-            // For now, relying on EV_TXCOMPLETE.
-            break; 
-
-        case STATE_POWER_DOWN_SENSOR:
-            DEBUG_PRINTLN(F("[State] POWER_DOWN_SENSOR"));
-            digitalWrite(SOIL_MOISTURE_POWER_PIN, LOW);
-            currentState = STATE_ENTER_SLEEP;
-            break;
-
-        case STATE_ENTER_SLEEP:
-            DEBUG_PRINTLN(F("[State] ENTER_SLEEP"));
-            DEBUG_PRINT(F("Entering deep sleep for ")); DEBUG_PRINT(current_interval_seconds); DEBUG_PRINTLN(F(" seconds."));
-            
-            #ifdef USE_AXP_POWER_MANAGEMENT
-            if (PMU) {
-                // Example: Power down LoRa module via PMIC if controlled (LDO3 or other rail)
-                // This is board specific. Some PMIC configurations might cut power automatically or require explicit command.
-                // PMU->disableControl(XPOWERS_LDO3); // If LDO3 powers LoRa
-                // PMU->setPowerOutPin(XPOWERS_DCDC1, XPOWERS_OFF); // Example if a GPIO like output is used for main system power stages
-                DEBUG_PRINTLN(F("PMIC: Preparing for deep sleep (e.g. disabling specific rails if configured)."));
-            }
-            #endif
-
-            // Ensure Serial buffer is flushed before sleep
-            Serial.flush(); 
-
-            deep_sleep_with_timer(current_interval_seconds);
-            // Execution stops here until wake-up
-            break;
-
-        case STATE_ERROR:
-            DEBUG_PRINTLN(F("[State] ERROR: An unrecoverable error occurred. Resetting."));
-            // Potentially log error to persistent storage if available
-            delay(5000); // Brief delay before reset
-            ESP.restart();
-            break;
-
-        default:
-            DEBUG_PRINTLN(F("Unknown state! Resetting state machine."));
-            currentState = STATE_INIT;
-            break;
-    }
-
-    // Let LMIC do its background processing for joining, transmission, and receiving downlinks.
-    os_runloop_once();
-}
-
-// --- LORAWAN EVENT CALLBACK ---
-void onEvent(ev_t ev) {
-    DEBUG_PRINT(os_getTime());
-    DEBUG_PRINT(F(": "));
-    switch (ev) {
-        case EV_SCAN_TIMEOUT:
-            DEBUG_PRINTLN(F("EV_SCAN_TIMEOUT"));
-            break;
-        case EV_BEACON_FOUND:
-            DEBUG_PRINTLN(F("EV_BEACON_FOUND"));
-            break;
-        case EV_BEACON_MISSED:
-            DEBUG_PRINTLN(F("EV_BEACON_MISSED"));
-            break;
-        case EV_BEACON_TRACKED:
-            DEBUG_PRINTLN(F("EV_BEACON_TRACKED"));
-            break;
-        case EV_JOINING:
-            DEBUG_PRINTLN(F("EV_JOINING"));
-            // currentState is already STATE_JOIN_LORAWAN
-            break;
-        case EV_JOINED:
-            DEBUG_PRINTLN(F("EV_JOINED"));
-            {
-                u4_t netid = 0;
-                devaddr_t devaddr = 0;
-                u1_t nwkKey[16];
-                u1_t artKey[16];
-                LMIC_getSessionKeys(&netid, &devaddr, nwkKey, artKey);
-                DEBUG_PRINT(F("NetID: ")); DEBUG_PRINTLN(netid, DEC);
-                DEBUG_PRINT(F("DevAddr: ")); DEBUG_PRINTLN(devaddr, HEX); 
-                // Store session keys and DevAddr in RTC memory if needed for ABP resume after sleep
-                // For OTAA, LMIC handles this internally if `LMIC_setSession` is used after wake-up.
-            }
-            // Disable link check validation (automatically enabled during join)
-            // Consider if this is needed for your network/region.
-            // LMIC_setLinkCheckMode(0);
-            lorawan_joined = true;
-            join_retry_count = 0; // Reset join retry counter on successful join
-            // Transition to idle, then sensor reading will be triggered by timer
-            currentState = STATE_IDLE; 
-            DEBUG_PRINTLN(F("LoRaWAN Join successful."));
-            break;
-        case EV_RFU1: // Reserved for Future Use
-            DEBUG_PRINTLN(F("EV_RFU1"));
-            break;
-        case EV_JOIN_FAILED:
-            DEBUG_PRINTLN(F("EV_JOIN_FAILED"));
-            lorawan_joined = false;
-            join_retry_count++;
-            if (join_retry_count < LORAWAN_JOIN_MAX_RETRIES) {
-                DEBUG_PRINTLN(F("Retrying join..."));
-                // LMIC will retry based on its schedule, or we can force it.
-                // For now, let os_runloop handle retries. If it doesn'''t, we might need to call LMIC_startJoining() again
-                // or go to sleep and retry after wake up.
-                // For simplicity, we will go to a short sleep and then retry the join state.
-                current_interval_seconds = LORAWAN_JOIN_RETRY_SLEEP_SECONDS;
-                currentState = STATE_ENTER_SLEEP; // Enter sleep, then try joining again via STATE_LORA_INIT
-            } else {
-                DEBUG_PRINTLN(F("Max join retries reached. Going to long sleep."));
-                current_interval_seconds = LORAWAN_JOIN_RETRY_SLEEP_SECONDS * 10; // Longer sleep
-                currentState = STATE_ENTER_SLEEP; // Will reset join_retry_count on next cycle if it goes through full init
-            }
-            break;
-        case EV_REJOIN_FAILED:
-            DEBUG_PRINTLN(F("EV_REJOIN_FAILED"));
-            // Similar to JOIN_FAILED, perhaps try re-joining from scratch
-            lorawan_joined = false;
-            currentState = STATE_LORA_INIT; // Try a full re-init and join
-            join_retry_count = 0;
-            break;
-        case EV_TXCOMPLETE:
-            DEBUG_PRINTLN(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
-            if (LMIC.txrxFlags & TXRX_ACK) {
-                DEBUG_PRINTLN(F("Received ACK"));
-            }
-            if (LMIC.dataLen) {
-                DEBUG_PRINT(F("Received "));
-                DEBUG_PRINT(LMIC.dataLen);
-                DEBUG_PRINTLN(F(" bytes of payload (downlink)"));
-                // Process downlink data if any
-                // Example: for (int i = 0; i < LMIC.dataLen; i++) { Serial.print((char)LMIC.frame[LMIC.dataBeg + i], HEX); }
-                // Serial.println();
-            }
-            tx_retry_count = 0; // Reset TX retry on successful send
-            currentState = STATE_POWER_DOWN_SENSOR; // Proceed to power down sensor and sleep
-            break;
-        case EV_LOST_TSYNC:
-            DEBUG_PRINTLN(F("EV_LOST_TSYNC"));
-            break;
-        case EV_RESET:
-            DEBUG_PRINTLN(F("EV_RESET"));
-            break;
-        case EV_RXCOMPLETE:
-            // data received in ping slot
-            DEBUG_PRINTLN(F("EV_RXCOMPLETE"));
-            break;
-        case EV_LINK_DEAD:
-            DEBUG_PRINTLN(F("EV_LINK_DEAD"));
-            lorawan_joined = false; // Assume connection is lost
-            currentState = STATE_LORA_INIT; // Try to re-join
-            join_retry_count = 0;
-            break;
-        case EV_LINK_ALIVE:
-            DEBUG_PRINTLN(F("EV_LINK_ALIVE"));
-            break;
-        case EV_TXSTART:
-            DEBUG_PRINTLN(F("EV_TXSTART"));
-            break;
-        case EV_TXCANCELED:
-            DEBUG_PRINTLN(F("EV_TXCANCELED"));
-            tx_retry_count++;
-            if (tx_retry_count < LORAWAN_MAX_TX_RETRIES) {
-                 DEBUG_PRINTLN(F("TX Canceled or failed, will retry transmission."));
-                 currentState = STATE_TRANSMIT_DATA; // Retry sending the same data
-            } else {
-                DEBUG_PRINTLN(F("Max TX retries reached. Giving up on this packet."));
-                currentState = STATE_POWER_DOWN_SENSOR; // Move to sleep
-            }
-            break;
-        case EV_JOIN_TXCOMPLETE: // For some regions, JOIN_ACCEPT is not piggybacked on beacon
-            DEBUG_PRINTLN(F("EV_JOIN_TXCOMPLETE: Join Request Sent."));
-            // EV_JOINED or EV_JOIN_FAILED will follow
-            break;
-        case EV_SCAN_FOUND: // Only for pure FSK, not LoRa
-            DEBUG_PRINTLN(F("EV_SCAN_FOUND"));
-            break;
-        default:
-            DEBUG_PRINT(F("Unknown event: "));
-            DEBUG_PRINTLN((unsigned)ev);
-            break;
-    }
-}
-
-// --- HELPER FUNCTIONS ---
-
-void setup_axp() {
 #ifdef USE_AXP_POWER_MANAGEMENT
-    DEBUG_PRINTLN(F("Initializing AXP PMIC..."));
+    setup_axp();
+#endif
+
+    pinMode(MOISTURE_PROBE_POWER_PIN, OUTPUT);
+    digitalWrite(MOISTURE_PROBE_POWER_PIN, LOW);
+
+    DEBUG_PRINT(F("Initializing SX1262 radio... "));
+    int radio_state = radio.begin(LORA_FREQUENCY, LORA_BANDWIDTH, LORA_SPREADING_FACTOR, LORA_CODING_RATE, LORA_SYNC_WORD, LORA_TX_POWER, LORA_PREAMBLE_LENGTH, 3.3, false);
+    if (radio_state == RADIOLIB_ERR_NONE) {
+        DEBUG_PRINTLN(F("success!"));
+    } else {
+        DEBUG_PRINT(F("failed, code ")); DEBUG_PRINTLN(radio_state);
+        DEBUG_PRINTLN(F("Halting due to radio init failure.")); while (true);
+    }
+    DEBUG_PRINTLN(F("Radio: Freq=") + String(LORA_FREQUENCY) + F("MHz, BW=") + String(LORA_BANDWIDTH) + F("kHz, SF=") + String(LORA_SPREADING_FACTOR) + F(", CR=4/") + String(LORA_CODING_RATE) + F(", TXPwr=") + String(LORA_TX_POWER) + F("dBm"));
+    DEBUG_PRINT(F("Selected Wood Species: ")); DEBUG_PRINTLN(pgm_read_ptr(&species_data[SELECTED_WOOD_SPECIES_INDEX].name));
+}
+
+// --- LOOP FUNCTION ---
+void loop() {
+    DEBUG_PRINTLN(F("\n--- Cycle Start ---"));
+
+    // 1. Read Wood Resistance
+    float R_ohms = read_wood_resistance_ohms();
+    if (R_ohms < 0 || R_ohms > 500000000.0f) { // Resistance too low (short?) or too high (open?)
+        DEBUG_PRINT(F("Unreliable resistance reading: ")); DEBUG_PRINTLN(R_ohms);
+        // Decide how to handle: send error, or last known good, or skip send
+    }
+
+    // 2. Calculate Indicated Moisture Content (MC)
+    WoodSpecies current_species;
+    memcpy_P(&current_species, &species_data[SELECTED_WOOD_SPECIES_INDEX], sizeof(WoodSpecies));
+    float mc_indicated = calculate_indicated_mc(R_ohms, current_species);
+    DEBUG_PRINT(F("Indicated MC (before temp correction): ")); DEBUG_PRINT(mc_indicated); DEBUG_PRINTLN(F(" %"));
+
+    // 3. Read Temperature
+    float wood_temp_c = DEFAULT_WOOD_TEMP_CELSIUS;
+    #if ENABLE_TEMPERATURE_COMPENSATION == true
+        wood_temp_c = read_esp_temperature_celsius();
+        DEBUG_PRINT(F("Wood/ESP32 Temp: ")); DEBUG_PRINT(wood_temp_c); DEBUG_PRINTLN(F(" C"));
+    #else
+        DEBUG_PRINTLN(F("Temperature compensation disabled. Using default temp."));
+    #endif
+
+    // 4. Get Temperature Correction Factor
+    float mc_corrected = mc_indicated;
+    #if ENABLE_TEMPERATURE_COMPENSATION == true
+        float temp_correction = get_temperature_correction(mc_indicated, wood_temp_c);
+        DEBUG_PRINT(F("Temperature Correction Factor: ")); DEBUG_PRINT(temp_correction); DEBUG_PRINTLN(F(" % MC"));
+        mc_corrected += temp_correction;
+    #endif
+    mc_corrected = constrain(mc_corrected, 0.0f, 100.0f); // Clamp to a sensible range
+    DEBUG_PRINT(F("FINAL Corrected MC: ")); DEBUG_PRINT(mc_corrected); DEBUG_PRINTLN(F(" %"));
+    
+    // 5. Read Battery Voltage
+    float battery_v = -1.0;
+    #ifdef USE_AXP_POWER_MANAGEMENT
+        if (pmic_initialized && PMU) battery_v = PMU->getBattVoltage() / 1000.0f;
+        DEBUG_PRINT(F("Battery Voltage: ")); DEBUG_PRINT(battery_v); DEBUG_PRINTLN(F(" V"));
+    #endif
+
+    // 6. Prepare Payload (Corrected MC % and Battery Voltage * 10)
+    byte payload[2];
+    payload[0] = (mc_corrected < 0 || mc_corrected > 100) ? 0xFF : (byte)round(mc_corrected); // 0-100, 0xFF for error state
+    payload[1] = (battery_v < 0) ? 0xFF : (byte)constrain((int)round(battery_v * 10), 0, 254);
+    DEBUG_PRINT(F("Payload: MC_byte=") + String(payload[0]) + F(", Batt_byte=") + String(payload[1]));
+
+    // 7. Transmit LoRa P2P Packet
+    DEBUG_PRINT(F("\nTransmitting LoRa P2P packet... "));
+    int transmit_state = radio.transmit(payload, sizeof(payload));
+    if (transmit_state == RADIOLIB_ERR_NONE) {
+        DEBUG_PRINTLN(F("success!"));
+    } else {
+        DEBUG_PRINT(F("failed, code ")); DEBUG_PRINTLN(transmit_state);
+    }
+
+    // 8. Deep Sleep
+    DEBUG_PRINTLN(F("Entering deep sleep for ") + String(sleep_interval_seconds) + F(" seconds."));
+    Serial.flush();
+    deep_sleep_with_timer(sleep_interval_seconds);
+}
+
+// --- SENSOR AND CALCULATION FUNCTIONS ---
+float read_wood_resistance_ohms() {
+    digitalWrite(MOISTURE_PROBE_POWER_PIN, HIGH);
+    delay(ADC_READ_STABILIZATION_MS);
+    
+    uint32_t adc_sum = 0;
+    for (int i = 0; i < ADC_SAMPLES_TO_AVERAGE; i++) {
+        adc_sum += analogRead(MOISTURE_PROBE_ADC_PIN);
+        delay(10); // Small delay between samples
+    }
+    digitalWrite(MOISTURE_PROBE_POWER_PIN, LOW);
+    float adc_raw_avg = (float)adc_sum / ADC_SAMPLES_TO_AVERAGE;
+
+    DEBUG_PRINT(F("Avg Raw ADC: ")); DEBUG_PRINTLN(adc_raw_avg);
+
+    if (adc_raw_avg >= (ADC_MAX_READING - 1.0f) ) { // Check if close to max (potential open circuit / very high resistance)
+        return 1.0e12; // Return a very large resistance value (1 TeraOhm)
+    }
+    if (adc_raw_avg < 1.0f) { // Check if close to min (potential short circuit)
+        return 1.0e-3; // Return a very small resistance value (1 milliOhm)
+    }
+
+    // R_wood = R_PULLUP * (adc_raw / (ADC_MAX_VALUE - adc_raw))
+    float R_wood = R_PULLUP_OHMS * (adc_raw_avg / (ADC_MAX_READING - adc_raw_avg));
+    DEBUG_PRINT(F("Calculated R_wood: ")); DEBUG_PRINT(R_wood); DEBUG_PRINTLN(F(" Ohms"));
+    return R_wood;
+}
+
+float calculate_indicated_mc(float R_wood_ohms, const WoodSpecies& species) {
+    if (R_wood_ohms <= 0) return 0; // Cannot take log of non-positive resistance
+    float R_kOhms = R_wood_ohms / 1000.0f;
+    if (R_kOhms <= 0) return 0; // Should not happen if R_wood_ohms is positive
+
+    // M = 10^(A + B * log10(R_kOhms))
+    float log10_R_kOhms = log10(R_kOhms);
+    float mc = pow(10, species.A + (species.B * log10_R_kOhms));
+    return mc;
+}
+
+float read_esp_temperature_celsius() {
+    // Convert internal temperature from Fahrenheit to Celsius
+    // temprature_sens_read() returns temp in F for ESP32. Needs ESP32 Arduino core >= 2.0.0
+    // For older cores, this function might not be available or might behave differently.
+    // If using an older core, you might need to include "soc/sens_reg.h" and read registers directly.
+    float temp_f = temprature_sens_read();
+    return (temp_f - 32.0) * 5.0 / 9.0;
+}
+
+float get_temperature_correction(float indicated_mc, float wood_temp_celsius) {
+    if (!ENABLE_TEMPERATURE_COMPENSATION) return 0.0f;
+
+    float wood_temp_f = (wood_temp_celsius * 9.0f / 5.0f) + 32.0f;
+
+    // Clamp inputs to the defined table ranges to avoid out-of-bounds access during interpolation
+    // and to handle extrapolation by using edge values.
+    wood_temp_f = constrain(wood_temp_f, pgm_read_float(&temp_points_f[0]), pgm_read_float(&temp_points_f[TEMP_POINTS_COUNT - 1]));
+    indicated_mc = constrain(indicated_mc, pgm_read_float(&mc_points_indicated[0]), pgm_read_float(&mc_points_indicated[MC_POINTS_COUNT - 1]));
+
+    return bilinear_interpolation(wood_temp_f, indicated_mc, temp_points_f, TEMP_POINTS_COUNT, mc_points_indicated, MC_POINTS_COUNT, correction_table);
+}
+
+// Bilinear interpolation function
+float bilinear_interpolation(float x, float y, 
+                           const float x_points[], int x_count, 
+                           const float y_points[], int y_count, 
+                           const float table[][MC_POINTS_COUNT]) {
+    // Find indices for x (temperature)
+    int x_idx = 0;
+    while (x_idx < x_count -1 && x > pgm_read_float(&x_points[x_idx+1])) {
+        x_idx++;
+    }
+    // Ensure x_idx is not x_count-1 if x is exactly x_points[x_count-1] to avoid reading past x_idx+1
+    if (x_idx == x_count -1 && x == pgm_read_float(&x_points[x_idx])){
+         x_idx = x_count -2; // Use the interval before last if x is the last point
+    }
+    if (x_idx >= x_count -1 ) x_idx = x_count - 2; // Protection
+    
+    // Find indices for y (indicated MC)
+    int y_idx = 0;
+    while (y_idx < y_count - 1 && y > pgm_read_float(&y_points[y_idx+1])) {
+        y_idx++;
+    }
+    if (y_idx == y_count - 1 && y == pgm_read_float(&y_points[y_idx])) {
+        y_idx = y_count - 2;
+    }
+    if (y_idx >= y_count -1) y_idx = y_count - 2; // Protection
+
+    float x1 = pgm_read_float(&x_points[x_idx]);
+    float x2 = pgm_read_float(&x_points[x_idx + 1]);
+    float y1 = pgm_read_float(&y_points[y_idx]);
+    float y2 = pgm_read_float(&y_points[y_idx + 1]);
+
+    float q11 = pgm_read_float(&table[x_idx][y_idx]);
+    float q12 = pgm_read_float(&table[x_idx][y_idx + 1]);
+    float q21 = pgm_read_float(&table[x_idx + 1][y_idx]);
+    float q22 = pgm_read_float(&table[x_idx + 1][y_idx + 1]);
+
+    if ((x2 - x1) == 0 || (y2 - y1) == 0) { // Avoid division by zero if points are identical
+        // This can happen if input x or y is exactly on a grid line and is also an edge point.
+        // Or if the lookup table points are not strictly increasing.
+        // Return nearest point or average, here simply q11 as a fallback.
+        return q11; 
+    }
+
+    float r1 = ((x2 - x) / (x2 - x1)) * q11 + ((x - x1) / (x2 - x1)) * q21;
+    float r2 = ((x2 - x) / (x2 - x1)) * q12 + ((x - x1) / (x2 - x1)) * q22;
+    float p = ((y2 - y) / (y2 - y1)) * r1 + ((y - y1) / (y2 - y1)) * r2;
+
+    return p;
+}
+
+
+// --- PMIC, SLEEP, AND UTILITY FUNCTIONS ---
+#ifdef USE_AXP_POWER_MANAGEMENT
+void setup_axp() {
+    DEBUG_PRINTLN(F("Initializing AXP192 PMIC..."));
     PMU = new XPowersLib();
     if (!PMU) {
-        DEBUG_PRINTLN(F("Failed to allocate XPowersLib object!"));
-        return;
+        DEBUG_PRINTLN(F("Failed to allocate XPowersLib object!")); pmic_initialized = false; return;
     }
-
-    #if AXP_CHIP_TYPE == AXP_CHIP_AXP192
-        int ret = PMU->init(Wire, 21, 22, AXP192_SLAVE_ADDRESS); // SDA, SCL, Address for AXP192
-    #elif AXP_CHIP_TYPE == AXP_CHIP_AXP2101
-        int ret = PMU->init(Wire, 21, 22, AXP2101_SLAVE_ADDRESS); // SDA, SCL, Address for AXP2101
-    #else
-        #error "Invalid AXP_CHIP_TYPE defined in config.h"
-        int ret = -1; // Ensure ret is defined
-    #endif
-
+    int ret = PMU->init(Wire, 21, 22, AXP192_SLAVE_ADDRESS);
     if (ret == XPOWERS_SUCCESS) {
-        DEBUG_PRINTLN(F("PMIC Initialized Successfully."));
-        // Basic AXP192/AXP2101 setup for T-Beam
-        // These settings are typical for T-Beams. Adjust if your board is different.
-        PMU->setPowerOutPut(XPOWERS_LDO2, XPOWERS_ON); // LDO2 is often used for LoRa module power
-        PMU->setPowerOutPut(XPOWERS_LDO3, XPOWERS_ON); // LDO3 is also sometimes used for LoRa or GPS
-        PMU->setPowerOutPut(XPOWERS_DCDC1, XPOWERS_ON); // DCDC1 is often ESP32 VDD
-        PMU->setPowerOutPut(XPOWERS_DCDC2, XPOWERS_ON); // Peripheral power
-        PMU->setPowerOutPut(XPOWERS_DCDC3, XPOWERS_ON); // Peripheral power
-
-        // Clear PMU IRQ unprocessed bits (important for waking from light sleep correctly)
+        DEBUG_PRINTLN(F("PMIC Initialized.")); pmic_initialized = true;
+        PMU->setPowerOutPut(XPOWERS_LDO2, XPOWERS_ON); PMU->setPowerOutPut(XPOWERS_LDO3, XPOWERS_ON);
+        PMU->setPowerOutPut(XPOWERS_DCDC1, XPOWERS_ON);
         PMU->clearIrqStatus();
-
-        // Set charging current and voltage (example values)
-        PMU->setChargeTargetVoltage(XPOWERS_AXP192_CHG_VOL_4V2); // Or XPOWERS_AXP2101_CHG_VOL_4V2 etc.
-        PMU->setChargeConstantCurrent(XPOWERS_AXP192_CHG_CUR_100MA); // Or another current setting
-
-        DEBUG_PRINT(F("PMIC Battery voltage: ")); DEBUG_PRINT(PMU->getBattVoltage() / 1000.0f); DEBUG_PRINTLN(F("V"));
-        DEBUG_PRINT(F("PMIC VIN voltage: ")); DEBUG_PRINT(PMU->getVinVoltage() / 1000.0f); DEBUG_PRINTLN(F("V"));
-
+        PMU->setChargeTargetVoltage(XPOWERS_AXP192_CHG_VOL_4V2);
+        PMU->setChargeConstantCurrent(XPOWERS_AXP192_CHG_CUR_100MA);
+        DEBUG_PRINT(F("PMIC Battery: ")); DEBUG_PRINT(PMU->getBattVoltage() / 1000.0f); DEBUG_PRINTLN(F("V"));
     } else {
-        DEBUG_PRINT(F("PMIC Initialization Failed, error code: ")); DEBUG_PRINTLN(ret);
-        delete PMU;
-        PMU = NULL;
+        DEBUG_PRINT(F("PMIC Init Failed, error: ")); DEBUG_PRINTLN(ret); delete PMU; PMU = NULL; pmic_initialized = false;
     }
-#else
-    DEBUG_PRINTLN(F("PMIC not used (USE_AXP_POWER_MANAGEMENT is false)."));
+}
 #endif
-}
-
-void setup_lora_pins() {
-    DEBUG_PRINTLN(F("Setting up LoRa module pins..."));
-    // SPI pins (MOSI, MISO, SCK) are typically configured by SPI.begin()
-    // which is called by os_init() -> hal_init() in LMIC.
-    // Ensure your board variant correctly defines these for the LoRa SPI bus (usually VSPI).
-
-    // Explicitly set Reset and NSS pins as output
-    pinMode(lmic_pins.nss, OUTPUT);
-    digitalWrite(lmic_pins.nss, HIGH); // Deselect slave initially
-    if (lmic_pins.rst != LMIC_UNUSED_PIN) {
-        pinMode(lmic_pins.rst, OUTPUT);
-        digitalWrite(lmic_pins.rst, HIGH);
-        delay(10);
-        digitalWrite(lmic_pins.rst, LOW);
-        delay(10);
-        digitalWrite(lmic_pins.rst, HIGH);
-        delay(10);
-        DEBUG_PRINTLN(F("LoRa Reset complete."));
-    }
-
-    // DIO pins are inputs, configured by LMIC HAL
-    if (lmic_pins.dio[0] != LMIC_UNUSED_PIN) pinMode(lmic_pins.dio[0], INPUT);
-    if (lmic_pins.dio[1] != LMIC_UNUSED_PIN) pinMode(lmic_pins.dio[1], INPUT);
-    if (lmic_pins.dio[2] != LMIC_UNUSED_PIN) pinMode(lmic_pins.dio[2], INPUT);
-    if (lmic_pins.busy != LMIC_UNUSED_PIN) pinMode(lmic_pins.busy, INPUT);
-
-    DEBUG_PRINTLN(F("LoRa Pin setup complete."));
-}
 
 void deep_sleep_with_timer(uint32_t seconds) {
-    DEBUG_PRINT(F("Configuring deep sleep for "));
-    DEBUG_PRINT(seconds);
-    DEBUG_PRINTLN(F(" seconds."));
-
-    esp_sleep_enable_timer_wakeup(seconds * 1000000ULL); // Time in microseconds
-
-    // Optional: Enable wakeup on specific GPIO if needed (e.g., user button)
-    // esp_sleep_enable_ext0_wakeup(GPIO_NUM_XX, 1); // 1 for high level, 0 for low
-
-    // Optional: Reduce power consumption during deep sleep further
-    // esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF); // Power down RTC peripherals
-    // esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF); // Power down RTC slow memory (RTC_DATA_ATTR variables will be lost!)
-    // esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF); // Power down RTC fast memory
-    // Use with caution. RTC_DATA_ATTR variables are stored in RTC_SLOW_MEM by default.
-
-    DEBUG_PRINTLN(F("Going to sleep now."));
-    Serial.flush(); // Ensure all serial output is sent
-
-    #ifdef USE_AXP_POWER_MANAGEMENT
-    if (PMU) {
-        // Example: Set AXP to a low power mode or disable outputs before sleep
-        // PMU->setSleep(); // May cut power to ESP32, requires PMU wake-up source
-        // This needs careful handling based on how AXP is wired and configured to wake up.
-        // For simple timer wakeup, ESP32 controls sleep. AXP settings focus on peripheral power.
-    }
-    #endif
-
+    DEBUG_PRINTLN(F("Configuring deep sleep for ") + String(seconds) + F(" seconds."));
+    esp_sleep_enable_timer_wakeup(seconds * 1000000ULL);
+    DEBUG_PRINTLN(F("Going to sleep now.")); Serial.flush();
     esp_deep_sleep_start();
-    // Code should not reach here after esp_deep_sleep_start()
 }
 
-// Helper to print byte in HEX
-void printHex2(unsigned v) {
-    v &= 0xff;
-    if (v < 16)
-        Serial.print('0');
-    Serial.print(v, HEX);
+void print_wakeup_reason(){
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  switch(wakeup_reason){
+    case ESP_SLEEP_WAKEUP_TIMER : DEBUG_PRINTLN(F("Wakeup: Timer")); break;
+    default : DEBUG_PRINT(F("Wakeup: Other (")); DEBUG_PRINT(wakeup_reason); DEBUG_PRINTLN(F(")"));break;
+  }
 }
-
-/* Placeholder for more advanced peripheral power management if needed */
-/*
-typedef enum {
-    POWER_SAVE_LEVEL_NONE = 0,
-    POWER_SAVE_LEVEL_CPU_LIGHT_SLEEP = 1, // ESP32 light sleep
-    POWER_SAVE_LEVEL_PERIPHERALS_OFF = 2, // Manually power down specific peripherals
-    POWER_SAVE_LEVEL_MODEM_SLEEP = 3 // ESP32 modem sleep (WiFi/BT off)
-} power_save_level_t;
-
-power_save_level_t disable_all_irrelevant_peripherals(void)
-{
-    // Example: turn off WiFi and Bluetooth
-    // WiFi.mode(WIFI_OFF);
-    // btStop();
-    // adc_power_off(); // Deprecated, use adc_power_release()
-
-#ifdef USE_AXP_POWER_MANAGEMENT
-    if(PMU){
-        // Selectively turn off power rails if not needed during specific operations
-        // E.g., PMU->setPowerOutPut(XPOWERS_LDO_GPS, XPOWERS_OFF);
-    }
-#endif
-    DEBUG_PRINTLN(F("Peripherals powered down (example)."));
-    return POWER_SAVE_LEVEL_PERIPHERALS_OFF;
-}
-
-void restore_all_irrelevant_peripherals(power_save_level_t level)
-{
-    if (level >= POWER_SAVE_LEVEL_PERIPHERALS_OFF) {
-        // Example: turn on components disabled earlier
-        // adc_power_on(); // Deprecated, use adc_power_acquire()
-#ifdef USE_AXP_POWER_MANAGEMENT
-        if(PMU){
-            // PMU->setPowerOutPut(XPOWERS_LDO_GPS, XPOWERS_ON);
-        }
-#endif
-        DEBUG_PRINTLN(F("Peripherals restored (example)."));
-    }
-}
-*/
-
-// --- LMIC HAL Requirement for ESP32 ---
-// MCCI LMIC requires this to be defined for ESP32 HAL
-// It provides the basis for os_time and related timing functions.
-extern "C" uint32_t arduino_ticks() {
-    return millis();
-}
-
-// Required for MCCI LMIC on ESP32 platform to link against. 
-// Provides a stub for non-existent function in the ESP32 Arduino core related to SPI device management.
-// This might vary depending on the ESP32 core version and LMIC library version.
-// If you encounter linking errors related to `spiDetachเพิ่มเติม`, this might be a workaround.
-// extern "C" void spiDetachเพิ่มเติม(uint8_t){} // Using Thai character as a unique suffix to avoid collision
-                                        // Update: Recent MCCI LMIC versions and ESP32 cores might not need this hack.
-                                        // Remove if it causes compilation errors.
-
-// Callback for LMIC radio transmission and reception.
-// For SX126x, this is handled internally by LMIC if using the correct HAL configuration.
-// For SX127x, you might need to implement radio_irq_handler.
-// extern "C" void radio_irq_handler(uint8_t dio, uint32_t timestamp) {
-//    LMIC_radio_irq_handler(dio, timestamp);
-// }
-
-// On ESP32, you might need to explicitly set the SPI pins if not using default VSPI
-// or if there are conflicts. LMIC_set ರಲ್ಲಿspi_pins can be used if the HAL supports it.
-
-
-
-
