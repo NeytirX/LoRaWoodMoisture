@@ -1,0 +1,333 @@
+# LoRaWAN Wood Moisture Monitoring System
+
+## Master Thesis Project in Wood Technologies
+
+**Firmware Version:** 2.0.0
+
+---
+
+## Project Overview
+
+This project implements a low-power, LoRaWAN-connected wood moisture monitoring system designed for long-term deployment in wood technology research and industrial applications. The system uses resistive probe technology based on the USDA Forest Products Laboratory (FPL) GTR-06 standard for accurate moisture content determination.
+
+This firmware is the consolidated version incorporating improvements from multiple development iterations, including LoRaWAN session persistence, DS18B20 temperature sensing, remote configuration via downlinks, and battery-aware power management.
+
+### Key Features
+
+- **Resistive Moisture Measurement:** Two-electrode resistive probe method following FPL GTR-06 guidelines
+- **Species-Specific Calibration:** Supports multiple wood species with dedicated coefficients (A, B parameters)
+- **Temperature Compensation:** Implements FPL GTR-06 Table 2 correction factors via bilinear interpolation
+- **DS18B20 Temperature Sensor:** Optional 1-Wire temperature probe for direct wood temperature measurement, with automatic fallback to ESP32 die temperature
+- **LoRaWAN Connectivity:** EU433 band, OTAA, Cayenne LPP payload format for IoT integration
+- **Session Persistence:** LoRaWAN nonces saved to NVS and session saved to RTC memory across deep sleep cycles (avoids costly OTAA rejoin every wake)
+- **Remote Configuration:** Downlink commands for adjusting measurement interval, wood species, TX power, and forcing rejoin
+- **Battery-Aware Power Management:** AXP192 PMIC integration with critical voltage protection and adaptive sleep intervals (2x/4x multiplier when battery is low/critical)
+- **Hardware Watchdog:** ESP32 Task Watchdog Timer prevents firmware hangs (120s timeout)
+- **Ultra-Low Power Design:** Deep sleep operation with configurable intervals (default: 1 hour)
+
+### Thesis Context
+
+This system was developed as part of a Master's thesis in Wood Technologies, focusing on:
+1. Practical implementation of resistance-based moisture measurement
+2. Embedded systems design for wood science applications
+3. Temperature compensation methodology for field deployments
+4. Validation of low-cost monitoring against reference instruments
+
+---
+
+## Hardware Requirements
+
+### Core Components
+
+| Component | Specification | Purpose |
+|-----------|---------------|---------|
+| TTGO T-Beam v1.1 | ESP32 + SX1262 LoRa | Main controller and radio |
+| AXP192 PMIC | Integrated on T-Beam | Power management and battery charging |
+| Resistive Moisture Probe | Two-electrode type | Wood moisture sensing |
+| 100k Pull-up Resistor | 1% tolerance recommended | Voltage divider reference |
+| Li-ion/LiPo Battery | 3.7V, 18650 or similar | Power source |
+
+### Pin Configuration
+
+```
+Moisture Probe:
+  - ADC Input: GPIO 32
+  - Power Control: GPIO 25
+  - Pull-up Resistor: 100k to 3.3V
+
+DS18B20 Temperature Sensor (optional):
+  - Data: GPIO 14 (with 4.7k pull-up to 3.3V)
+
+LoRa (SX1262):
+  - CS/NSS: GPIO 5
+  - RESET: GPIO 27
+  - DIO1: GPIO 33
+  - BUSY: GPIO 26
+
+I2C (PMIC):
+  - SDA: GPIO 21
+  - SCL: GPIO 22
+```
+
+### Optional/Recommended
+
+- DS18B20 temperature sensor for direct wood temperature measurement (highly recommended for accurate temperature correction)
+- Enclosure with IP65+ rating for outdoor deployment
+- Solar panel for extended deployments
+
+---
+
+## Setup Instructions
+
+### Prerequisites
+
+1. **PlatformIO IDE** (VS Code extension) or PlatformIO CLI
+2. **Python 3.8+** (for PlatformIO)
+3. **USB cable** (micro-USB for T-Beam)
+4. **LoRaWAN Network Server** account (e.g., The Things Network)
+
+### Installation Steps
+
+1. **Open the project** in PlatformIO
+
+2. **Install dependencies** (automatic on first build):
+   ```bash
+   pio run
+   ```
+
+3. **Configure LoRaWAN credentials:**
+   - Open `include/lorawan_keys.h`
+   - Enter your Join EUI and Device EUI as **MSB** `uint64_t` hex literals (e.g., `0x0000000000000000`)
+   - Enter your Network Key and Application Key as **MSB** `uint8_t[16]` byte arrays
+   - For TTN v3: Copy the EUI/key values in MSB (big-endian) format
+
+4. **Select wood species:**
+   - Open `include/config.h`
+   - Set `SELECTED_WOOD_SPECIES_INDEX` to match your target species
+   - Available species are defined in `include/wood_species_data.h`
+
+5. **Upload firmware:**
+   ```bash
+   pio run --target upload
+   ```
+
+6. **Monitor serial output:**
+   ```bash
+   pio device monitor -b 115200
+   ```
+
+---
+
+## Configuration Guide
+
+### Moisture Measurement Settings (`config.h`)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `MOISTURE_PROBE_ADC_PIN` | 32 | ADC input pin |
+| `MOISTURE_PROBE_POWER_PIN` | 25 | Power control pin |
+| `R_PULLUP_OHMS` | 100000.0f | Pull-up resistor value |
+| `ADC_SAMPLES_TO_AVERAGE` | 10 | Samples per reading |
+| `ADC_ATTENUATION` | ADC_11db | ADC range (0-3.3V) |
+| `SELECTED_WOOD_SPECIES_INDEX` | 0 | Species table index |
+| `ENABLE_TEMPERATURE_COMPENSATION` | true | Enable temp correction |
+| `ONEWIRE_PIN` | 14 | DS18B20 data pin |
+
+### Operational Settings
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `NORMAL_SEND_INTERVAL_SECONDS` | 3600 | Measurement interval (1 hour) |
+| `LORAWAN_JOIN_MAX_RETRIES` | 5 | Max join attempts |
+| `LORAWAN_MAX_TX_RETRIES` | 3 | Max TX retries per packet |
+| `BATTERY_CRITICAL_MV` | 3200 | Critical cutoff voltage (mV) |
+| `LOW_BATTERY_THRESHOLD_V` | 3.4 | Extended sleep threshold (V) |
+| `WATCHDOG_TIMEOUT_SECONDS` | 120 | Watchdog timer (seconds) |
+
+### Downlink Commands (Remote Configuration)
+
+Send downlink messages on any port to reconfigure the device:
+
+| Command | Byte Format | Description |
+|---------|-------------|-------------|
+| Set Interval | `0x01 HH LL` | Set measurement interval (HH:LL = minutes, big-endian uint16) |
+| Set Species | `0x02 XX` | Set wood species index (XX = 0-6) |
+| Force Rejoin | `0x03` | Force a fresh OTAA join on next wake |
+| Set TX Power | `0x04 XX` | Set TX power index |
+
+### Adding Wood Species
+
+Edit `include/wood_species_data.h`:
+
+```cpp
+// 1. Add a PROGMEM name string
+static const char SPECIES_NAME_7[] PROGMEM = "Your Species Name";
+
+// 2. Add entry to the species_data[] array
+const WoodSpecies species_data[] PROGMEM = {
+    // ... existing entries ...
+    {SPECIES_NAME_7, A_coefficient, B_coefficient},
+};
+```
+
+Coefficients should be sourced from FPL GTR-06 Table 1 or peer-reviewed literature.
+
+---
+
+## Data Format (Cayenne LPP)
+
+The device transmits data using Cayenne Low Power Payload format:
+
+| Channel | Type | Description | Data Type |
+|---------|------|-------------|-----------|
+| 1 | Analog Input | Wood Moisture Content (%) | Float |
+| 2 | Temperature | Wood Temperature (C) | Float |
+| 3 | Analog Input | Indicated MC (pre-correction) | Float |
+| 4 | Analog Input | Resistance (k) | Float |
+| 5 | Analog Input | Battery Voltage (V) | Float |
+| 6 | Temperature | ESP32 Internal Temp (C) | Float |
+
+**Note:** Channels 3, 4, and 6 are commented out by default to conserve payload space. Enable in `main.cpp` if needed for debugging.
+
+---
+
+## Firmware Architecture
+
+### Sequential Boot-to-Sleep Design (8 Phases)
+
+The firmware uses RadioLib v7.6.0 with a synchronous/blocking API. The entire measure-send-sleep cycle runs once in `setup()`, then the ESP32 enters deep sleep. On wake, the ESP32 restarts and `setup()` runs again. `loop()` is never reached.
+
+```
+ESP32 Boot (reset / timer wake)
+         |
+         v
+  Phase 1: PMIC Setup
+  (AXP192 init, enable LoRa power, disable GPS)
+         |
+         v
+  Phase 2: Sensor Init
+  (ADC config, DS18B20 detection)
+         |
+         v
+  Phase 3: Radio Init + Join/Restore
+  (SX1262 begin, restore session from NVS/RTC, OTAA activate)
+         |
+    [activateOTAA result]
+    /                    \
+  SESSION_RESTORED     NEW_SESSION
+  (skip join)          (fresh join)
+         \                /
+          v              v
+  Phase 4: Battery Check
+  (read voltage, abort if critical -> extended sleep)
+         |
+         v
+  Phase 5: Sensor Measurement
+  (resistance, temperature, MC calculation with species correction)
+         |
+         v
+  Phase 6: Build Payload
+  (Cayenne LPP encoding)
+         |
+         v
+  Phase 7: LoRaWAN Uplink
+  (sendReceive(), process downlink commands, save session)
+         |
+         v
+  Phase 8: Deep Sleep
+  (timer wakeup configured, battery-aware interval)
+```
+
+### Key Modules
+
+| Module | File | Function |
+|--------|------|----------|
+| Configuration | `include/config.h` | System parameters and thresholds |
+| Sensor Layer | `include/sensor.h` | ADC, DS18B20, resistance measurement |
+| Session Manager | `include/session_manager.h` | LoRaWAN session save/restore (nonces in NVS, session in RTC memory) |
+| Species Data | `include/wood_species_data.h` | FPL GTR-06 species coefficients (PROGMEM) |
+| Temp Correction | `include/wood_temp_correction_data.h` | FPL GTR-06 Table 2 correction factors |
+| LoRaWAN Keys | `include/lorawan_keys.h` | Network credentials (MSB format: `uint64_t` EUIs, `uint8_t[16]` keys) |
+| Main Logic | `src/main.cpp` | Sequential boot-to-sleep flow, downlink handling |
+
+### Libraries
+
+| Library | Version | Purpose |
+|---------|---------|---------|
+| RadioLib | ^7.1.0 | SX1262 LoRa radio driver + LoRaWAN stack |
+| CayenneLPP | ^1.6.0 | Low Power Payload encoding |
+| XPowersLib | ^0.1.9 | AXP192 PMIC control |
+| OneWire | ^2.3.8 | 1-Wire bus protocol |
+| DallasTemperature | ^3.11.0 | DS18B20 temperature sensor |
+
+### Build Statistics
+
+| Resource | Usage |
+|----------|-------|
+| RAM | 2.0% (26,232 / 1,310,720 bytes) |
+| Flash | 32.4% (424,713 / 1,310,720 bytes) |
+
+---
+
+## Technical Documentation
+
+The following detailed documentation is available in the `docs/` directory:
+
+1. **[Firmware Architecture](docs/firmware_architecture.md)** - Detailed sequential flow, module documentation, and memory layout
+2. **[Calibration Procedure](docs/calibration_procedure.md)** - Probe calibration and verification methods
+3. **[Deployment Guide](docs/deployment_guide.md)** - Installation and field deployment instructions
+4. **[Data Interpretation](docs/data_interpretation.md)** - Understanding moisture readings, temperature correction, and analysis methods
+
+---
+
+## Thesis Documentation Structure
+
+For thesis writing, the following chapter structure is recommended:
+
+```
+Chapter 1: Introduction
+  1.1 Background and Motivation
+  1.2 Research Objectives
+  1.3 Thesis Structure
+
+Chapter 2: Literature Review
+  2.1 Wood Moisture Measurement Methods
+  2.2 FPL GTR-06 Standard
+  2.3 Temperature Compensation in Wood
+  2.4 IoT and LoRaWAN in Forestry/Wood Industry
+
+Chapter 3: Materials and Methods
+  3.1 Embedded System Design
+  3.2 Moisture Measurement Implementation
+  3.3 Temperature Compensation Algorithm
+  3.4 Data Transmission and Storage
+
+Chapter 4: Results
+  4.1 Calibration Results
+  4.2 Field Deployment Data
+  4.3 Validation Against Reference
+
+Chapter 5: Discussion
+  5.1 Accuracy and Limitations
+  5.2 Temperature Proxy Discussion (ESP32 vs DS18B20)
+  5.3 Practical Implications
+
+Chapter 6: Conclusions
+  6.1 Summary of Findings
+  6.2 Recommendations for Future Work
+
+References
+Appendices
+```
+
+---
+
+## License
+
+This project is part of academic research. Please cite appropriately if used in your work.
+
+---
+
+## Contact
+
+For thesis-related inquiries, contact the author through academic channels.
