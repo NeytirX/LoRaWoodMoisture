@@ -1,65 +1,136 @@
 // config.h - Project Configuration File (LoRaWAN Wood Moisture Version)
+//
+// Consolidated configuration for the wood moisture sensor firmware.
+// Uses RadioLib (SX1262 + EU433) instead of MCCI LMIC.
+// Incorporates improvements from idk claude code and idk3.
 
 #ifndef CONFIG_H
 #define CONFIG_H
 
 #include <Arduino.h>
-#include <lmic.h> // For LoRaWAN constants
-#include "wood_species_data.h" // Include for species selection
-#include "lorawan_keys.h"      // Include for LoRaWAN OTAA keys
+#include "wood_species_data.h"      // Include for species selection
+#include "lorawan_keys.h"           // Include for LoRaWAN OTAA keys
 
-// --- DEBUG OPTIONS ---
+// =============================================================================
+// DEBUG OPTIONS
+// =============================================================================
 #define SERIAL_BAUD 115200
 #define DEBUG_PRINTLN(x) Serial.println(x)
-#define DEBUG_PRINT(x) Serial.print(x)
+#define DEBUG_PRINT(x)   Serial.print(x)
+// Uncomment to disable all debug prints (saves flash/RAM in release builds):
+// #define DEBUG_PRINTLN(x)
+// #define DEBUG_PRINT(x)
 
-// --- POWER MANAGEMENT (AXP192/AXP2101) ---
+// =============================================================================
+// FIRMWARE VERSION
+// =============================================================================
+#define FIRMWARE_VERSION_MAJOR 2
+#define FIRMWARE_VERSION_MINOR 0
+#define FIRMWARE_VERSION_PATCH 0
+
+// =============================================================================
+// POWER MANAGEMENT (AXP192 - T-Beam v1.1)
+// =============================================================================
 #define USE_AXP_POWER_MANAGEMENT true
-#define AXP_CHIP_AXP192 0
-#define AXP_CHIP_AXP2101 1
-#define AXP_CHIP_TYPE AXP_CHIP_AXP192 // T-Beam v1.1 uses AXP192
+// Note: AXP192_SLAVE_ADDRESS is defined by XPowersLib in AXP192Constants.h
+// Do NOT redefine it here.
 
-// --- WOOD MOISTURE SENSOR (RESISTIVE PROBE) ---
-#define MOISTURE_PROBE_ADC_PIN 32
+// =============================================================================
+// WOOD MOISTURE SENSOR (RESISTIVE PROBE)
+// =============================================================================
+#define MOISTURE_PROBE_ADC_PIN   32
 #define MOISTURE_PROBE_POWER_PIN 25
 #define ADC_READ_STABILIZATION_MS 100
-#define ADC_SAMPLES_TO_AVERAGE 10
+#define ADC_SAMPLES_TO_AVERAGE    10
 
-#define R_PULLUP_OHMS 100000.0f        // Value of the pull-up resistor in Ohms (e.g., 100k). CRITICAL.
-#define ADC_MAX_READING 4095.0f        // Max ADC reading (12-bit for ESP32)
-#define VCC_PROBE_VOLTAGE 3.3f         // Voltage supplied to the voltage divider
+#define R_PULLUP_OHMS      100000.0f  // Pull-up resistor value (Ohms). CRITICAL for accuracy.
+#define ADC_MAX_READING    4095.0f    // 12-bit ADC max (ESP32)
+#define VCC_PROBE_VOLTAGE  3.3f       // Voltage supplied to the voltage divider
 
-#define SELECTED_WOOD_SPECIES_INDEX 0  // Index from species_data[] in wood_species_data.h
+// ADC Attenuation - ADC_11db gives full 0-3.3V range on ESP32
+// Options: ADC_0db (0-1.1V), ADC_2_5db (0-1.5V), ADC_6db (0-2.2V), ADC_11db (0-3.3V)
+#define ADC_ATTENUATION    ADC_11db
 
+// Species selection (index into species_data[] in wood_species_data.h)
+#define SELECTED_WOOD_SPECIES_INDEX 0
+
+// Resistance validation bounds (Ohms) - warn if outside species calibration range
+// Typical resistive moisture meters work from ~1kOhm (very wet) to ~200MOhm (very dry)
+#define MIN_VALID_RESISTANCE_OHMS   1000.0f       // 1 kOhm
+#define MAX_VALID_RESISTANCE_OHMS   200000000.0f  // 200 MOhm
+
+// =============================================================================
+// TEMPERATURE SENSING
+// =============================================================================
 #define ENABLE_TEMPERATURE_COMPENSATION true
-#define DEFAULT_WOOD_TEMP_CELSIUS 21.0f // Approx 70°F, used if temp sensor fails
+#define DEFAULT_WOOD_TEMP_CELSIUS 21.0f   // ~70F, used if temp sensor fails
 
-// --- LORAWAN CONFIGURATION ---
-// LoRaWAN Keys (APPEUI, DEVEUI, APPKEY) are now in lorawan_keys.h
+// DS18B20 1-Wire Temperature Sensor (integrated in probe assembly)
+// GPIO 14 is free on the T-Beam v1.1 and suitable for 1-Wire
+#define ONEWIRE_PIN              14
+#define DS18B20_RESOLUTION_BITS  12       // 9..12 bits (12 = 0.0625C, ~750ms conversion)
+#define DS18B20_READ_TIMEOUT_MS  1000     // Max wait for conversion
 
-// --- LORA RADIO PINS (SX1262 for MCCI LMIC on T-Beam) ---
-#define LORA_CS_PIN   5  // NSS, SPI Chip Select
-#define LORA_RST_PIN  27 // RESET
-#define LORA_DIO1_PIN 33 // DIO1 (IRQ)
-#define LORA_BUSY_PIN 26 // BUSY
-// SPI pins (SCK, MISO, MOSI) are handled by the SPIClass instance.
+// =============================================================================
+// LORA RADIO PINS (SX1262 on T-Beam v1.1)
+// =============================================================================
+#define LORA_CS_PIN   5   // NSS / SPI Chip Select
+#define LORA_RST_PIN  27  // RESET
+#define LORA_DIO1_PIN 33  // DIO1 (IRQ)
+#define LORA_BUSY_PIN 26  // BUSY
+// SPI pins (SCK=18, MISO=19, MOSI=23) handled by default SPIClass instance.
 
-// --- OPERATIONAL INTERVALS ---
-#define NORMAL_SEND_INTERVAL_SECONDS (60 * 60) // e.g., 60 minutes
-// #define ALERT_SEND_INTERVAL_SECONDS (15 * 60) // Alternative interval if needed later
+// =============================================================================
+// OPERATIONAL INTERVALS
+// =============================================================================
+#define NORMAL_SEND_INTERVAL_SECONDS   (60 * 60)  // 60 minutes
+// #define ALERT_SEND_INTERVAL_SECONDS (15 * 60)  // Alternative shorter interval
 
-// --- DEEP SLEEP & LORAWAN RETRIES ---
-#define LORAWAN_JOIN_MAX_RETRIES 5
-#define LORAWAN_JOIN_RETRY_SLEEP_SECONDS 30
-#define LORAWAN_MAX_TX_RETRIES 3 // Retries for a single packet (LMIC may also have internal retries)
+// =============================================================================
+// BATTERY-AWARE SLEEP
+// =============================================================================
+#define BATTERY_CRITICAL_MV            3200    // 3.2V cutoff - stop operation
+#define BATTERY_LOW_MV                 3500    // 3.5V warning
+#define LOW_BATTERY_THRESHOLD_V        3.4f    // Below this, extend sleep to conserve power
+#define CRITICAL_BATTERY_THRESHOLD_V   3.2f    // Below this, sleep even longer
+#define LOW_BATTERY_SLEEP_MULTIPLIER   2       // 2x normal interval when low
+#define CRITICAL_BATTERY_SLEEP_MULTIPLIER 4    // 4x normal interval when critical
 
-// --- CAYENNE LPP CHANNELS ---
-#define LPP_CHANNEL_WOOD_MC 1          // Wood Moisture Content (%)
-#define LPP_CHANNEL_WOOD_TEMP 2        // Wood Temperature (°C)
-#define LPP_CHANNEL_INDICATED_MC 3     // Indicated MC (before temp correction)
-#define LPP_CHANNEL_RESISTANCE 4       // Wood Resistance (kOhms) - for debugging/analysis
+// =============================================================================
+// DEEP SLEEP & LORAWAN RETRIES
+// =============================================================================
+#define LORAWAN_JOIN_MAX_RETRIES          5
+#define LORAWAN_JOIN_RETRY_SLEEP_SECONDS  30
+#define LORAWAN_MAX_TX_RETRIES            3   // App-level retries per packet
+
+// =============================================================================
+// WATCHDOG TIMER
+// =============================================================================
+#define WATCHDOG_TIMEOUT_SECONDS  120  // Reset if loop hangs for > 2 minutes
+
+// =============================================================================
+// CAYENNE LPP CHANNELS
+// =============================================================================
+#define LPP_CHANNEL_WOOD_MC         1  // Wood Moisture Content (%)
+#define LPP_CHANNEL_WOOD_TEMP       2  // Wood Temperature (C)
+#define LPP_CHANNEL_INDICATED_MC    3  // Indicated MC (before temp correction)
+#define LPP_CHANNEL_RESISTANCE      4  // Wood Resistance (kOhms)
 #define LPP_CHANNEL_BATTERY_VOLTAGE 5  // Battery Voltage (V)
-#define LPP_CHANNEL_ESP_TEMP 6         // ESP32 Internal Chip Temperature (°C)
+#define LPP_CHANNEL_ESP_TEMP        6  // ESP32 Internal Chip Temperature (C)
 
+// =============================================================================
+// DOWNLINK COMMAND BYTES (for remote configuration via LoRaWAN downlink)
+// =============================================================================
+// Downlink payload format: [CMD_BYTE] [VALUE_BYTE(s)]
+#define DOWNLINK_CMD_SET_INTERVAL   0x01  // + 2 bytes: interval in minutes (uint16 big-endian)
+#define DOWNLINK_CMD_SET_SPECIES    0x02  // + 1 byte: species index
+#define DOWNLINK_CMD_FORCE_REJOIN   0x03  // No extra bytes - forces a fresh OTAA join
+#define DOWNLINK_CMD_SET_TX_POWER   0x04  // + 1 byte: TX power index
+
+// =============================================================================
+// NVS (Non-Volatile Storage) KEYS for RadioLib session persistence
+// =============================================================================
+#define NVS_NAMESPACE       "lorawan"
+#define NVS_KEY_NONCES      "nonces"
 
 #endif // CONFIG_H
