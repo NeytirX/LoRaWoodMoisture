@@ -279,47 +279,6 @@ The following detailed documentation is available in the `docs/` directory:
 4. **[Data Interpretation](docs/data_interpretation.md)** - Understanding moisture readings, temperature correction, and analysis methods
 
 ---
-
-## Thesis Documentation Structure
-
-For thesis writing, the following chapter structure is recommended:
-
-```
-Chapter 1: Introduction
-  1.1 Background and Motivation
-  1.2 Research Objectives
-  1.3 Thesis Structure
-
-Chapter 2: Literature Review
-  2.1 Wood Moisture Measurement Methods
-  2.2 FPL GTR-06 Standard
-  2.3 Temperature Compensation in Wood
-  2.4 IoT and LoRaWAN in Forestry/Wood Industry
-
-Chapter 3: Materials and Methods
-  3.1 Embedded System Design
-  3.2 Moisture Measurement Implementation
-  3.3 Temperature Compensation Algorithm
-  3.4 Data Transmission and Storage
-
-Chapter 4: Results
-  4.1 Calibration Results
-  4.2 Field Deployment Data
-  4.3 Validation Against Reference
-
-Chapter 5: Discussion
-  5.1 Accuracy and Limitations
-  5.2 Temperature Proxy Discussion (ESP32 vs DS18B20)
-  5.3 Practical Implications
-
-Chapter 6: Conclusions
-  6.1 Summary of Findings
-  6.2 Recommendations for Future Work
-
-References
-Appendices
-```
-
 ---
 
 ## License
