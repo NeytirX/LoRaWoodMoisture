@@ -2,3 +2,5 @@
 *.bin
 *.elf
 *.map
+include/lorawan_keys.h
+

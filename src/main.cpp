@@ -22,6 +22,7 @@
 #include <SPI.h>
 #include <RadioLib.h>
 #include <esp_task_wdt.h>            // ESP32 Task Watchdog Timer
+#include <Preferences.h>             // NVS for saving settings
 
 #include "config.h"
 #include "wood_species_data.h"
@@ -89,6 +90,8 @@ float last_esp_temp_c    = -100.0f;
 // =============================================================================
 void setup() {
     Serial.begin(SERIAL_BAUD);
+    // TODO: For production deployments, remove or wrap this 2-second delay in a debug flag.
+    // Idling at full power every wake cycle significantly degrades long-term battery life.
     while (!Serial && millis() < 2000);
     DEBUG_PRINTLN(F("\n========================================"));
     DEBUG_PRINTLN(F(" Wood Moisture Sensor (LoRaWAN/RadioLib)"));
@@ -116,8 +119,13 @@ void setup() {
         DEBUG_PRINTLN(F("Cold boot or reset. Full initialization."));
         lorawan_joined = false;
         join_retry_count = 0;
-        current_interval_seconds = NORMAL_SEND_INTERVAL_SECONDS;
-        selected_species_index = SELECTED_WOOD_SPECIES_INDEX;
+
+        Preferences prefs;
+        prefs.begin("app_config", true); // Open read-only
+        current_interval_seconds = prefs.getUInt("interval", NORMAL_SEND_INTERVAL_SECONDS);
+        selected_species_index = prefs.getUChar("species", SELECTED_WOOD_SPECIES_INDEX);
+        prefs.end();
+
         session_invalidate();
     } else {
         DEBUG_PRINTLN(F("Woke from deep sleep."));
@@ -420,6 +428,10 @@ void process_downlink(uint8_t *data, uint8_t len) {
                 uint16_t interval_minutes = (data[1] << 8) | data[2];
                 if (interval_minutes >= 1 && interval_minutes <= 1440) {
                     current_interval_seconds = (uint32_t)interval_minutes * 60;
+                    Preferences prefs;
+                    prefs.begin("app_config", false);
+                    prefs.putUInt("interval", current_interval_seconds);
+                    prefs.end();
                     DEBUG_PRINT(F("  [DL] Interval set to "));
                     DEBUG_PRINT(interval_minutes);
                     DEBUG_PRINTLN(F(" minutes"));
@@ -434,6 +446,10 @@ void process_downlink(uint8_t *data, uint8_t len) {
                 uint8_t species_idx = data[1];
                 if (species_idx < NUM_WOOD_SPECIES) {
                     selected_species_index = species_idx;
+                    Preferences prefs;
+                    prefs.begin("app_config", false);
+                    prefs.putUChar("species", selected_species_index);
+                    prefs.end();
                     DEBUG_PRINT(F("  [DL] Species changed to index "));
                     DEBUG_PRINTLN(species_idx);
                 } else {
