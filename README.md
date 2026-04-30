@@ -2,7 +2,7 @@
 
 ## Master Thesis Project in Wood Technologies
 
-**Firmware Version:** 2.0.0
+**Firmware Version:** 1.0.1
 
 ---
 
