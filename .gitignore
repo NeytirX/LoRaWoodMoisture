@@ -1,6 +1,9 @@
 .pio/
+.vscode/
+.kilo/
 *.bin
 *.elf
 *.map
 include/lorawan_keys.h
-
+STRATEGY.md
+docs\plans\*md
