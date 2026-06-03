@@ -6,4 +6,4 @@
 *.map
 include/lorawan_keys.h
 STRATEGY.md
-docs\plans\*md
+docs/plans/*md
