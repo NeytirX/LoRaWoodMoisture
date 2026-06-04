@@ -5,7 +5,7 @@
 This document provides comprehensive instructions for deploying the LoRaWAN Wood Moisture Monitoring System in field conditions. It covers site selection, physical installation, network configuration, and ongoing maintenance.
 
 **Application:** Master Thesis in Wood Technologies - Field Deployment
-**System:** LoRaWAN-connected resistive moisture monitoring (TTGO T-Beam v1.1)
+**System:** LoRaWAN-connected resistive moisture monitoring (TTGO T-Beam v1.1/v1.2)
 **Firmware Version:** 2.0.0
 
 ---
@@ -35,7 +35,7 @@ This document provides comprehensive instructions for deploying the LoRaWAN Wood
 ### 1.2 Equipment Checklist
 
 **Required:**
-- [ ] TTGO T-Beam v1.1 device with firmware v2.0.0 loaded
+- [ ] TTGO T-Beam v1.1/v1.2 device with firmware v1.1.0 loaded
 - [ ] Moisture probe (2-electrode resistive type)
 - [ ] 100 kOhm pull-up resistor (1% tolerance, 1/4W)
 - [ ] Enclosure (IP65 or higher rating)
@@ -67,12 +67,12 @@ This document provides comprehensive instructions for deploying the LoRaWAN Wood
 **Circuit Diagram:**
 
 ```
-                    3.3V (from ESP32)
+             GPIO 25 (probe power, HIGH only during measurement)
                       |
                  [R_pullup]
                    100 kOhm
                       |
-                      +--------> To GPIO 32 (ADC input)
+                      +--------> To GPIO 35 (ADC input)
                       |
                    Probe 1
                       |
@@ -84,8 +84,9 @@ This document provides comprehensive instructions for deploying the LoRaWAN Wood
 ```
 
 **Important Notes:**
-- The firmware v2.0.0 does NOT use GPIO 25 for power switching of the probe. The probe circuit is always connected to 3.3V via the pull-up resistor.
-- GPIO 25 (`MOISTURE_PROBE_POWER_PIN`) is defined in config.h but only used for optional power gating if you modify the firmware.
+- The firmware drives GPIO 25 (`MOISTURE_PROBE_POWER_PIN`) HIGH only during the measurement window, so the probe sees no continuous DC bias (prevents electrode corrosion and wood polarization) and draws no current between cycles.
+- Do NOT wire the pull-up to 3.3V directly; the divider must hang off GPIO 25 or the readings will be valid but the probe stays permanently energized.
+- GPIO 35 is input-only (ADC1_CH7) - it cannot be repurposed as an output. GPIO 32 must stay free: it is the LoRa radio's BUSY line.
 
 **Wiring Steps:**
 
@@ -93,8 +94,8 @@ This document provides comprehensive instructions for deploying the LoRaWAN Wood
 
 2. **Solder connections:**
    ```
-   Probe Wire 1 --+-- 100k resistor -- 3.3V
-                   +-- Wire to GPIO 32
+   Probe Wire 1 --+-- 100k resistor -- GPIO 25 (probe power)
+                   +-- Wire to GPIO 35 (ADC)
    Probe Wire 2 -- GND
    ```
 
@@ -106,7 +107,7 @@ This document provides comprehensive instructions for deploying the LoRaWAN Wood
 4. **Test continuity:**
    ```
    Multimeter check:
-   - 3.3V to GPIO 32: ~100 kOhm (through resistor)
+   - GPIO 25 to GPIO 35: ~100 kOhm (through resistor)
    - Probe 1 to Probe 2 (in air): > 10 MOhm
    ```
 
@@ -702,7 +703,7 @@ activateOTAA: SESSION_RESTORED
 
 | Message | Meaning | Action |
 |---------|---------|--------|
-| "PMIC init failed" | AXP192 not responding | Check I2C connections |
+| "PMIC init failed" | No AXP192/AXP2101 responding | Check I2C connections |
 | "activateOTAA failed" | LoRaWAN join failed | Verify keys, check coverage |
 | "Invalid resistance reading" | ADC reading out of range | Check probe wiring |
 | "CRITICAL: Battery voltage too low" | Below 3.2V | Replace battery |

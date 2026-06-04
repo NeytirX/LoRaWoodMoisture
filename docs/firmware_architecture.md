@@ -5,7 +5,7 @@
 This document describes the firmware architecture of the LoRaWAN Wood Moisture Monitoring System, implemented for a Master's thesis in Wood Technologies. The firmware uses a **sequential blocking flow** optimized for ultra-low power operation — the entire measure-send-sleep cycle runs once per boot in `setup()`.
 
 **File:** `src/main.cpp`
-**Framework:** Arduino ESP32 with RadioLib v7.6.0
+**Framework:** Arduino ESP32 with RadioLib (pinned `^7.1.0`, resolves to 7.7.1 as of 2026-06-04)
 **Design Pattern:** Sequential boot-to-sleep cycle (no state machine, no `loop()`)
 
 ---
@@ -22,7 +22,7 @@ This document describes the firmware architecture of the LoRaWAN Wood Moisture M
 |  +--------------+    +--------------+    +--------------+        |
 |  |   Power      |    |    LoRaWAN   |    |   Moisture   |        |
 |  |  Management  |    |   Protocol   |    |  Measurement |        |
-|  |   (AXP192)   |    |  (RadioLib)  |    |   (ADC)      |        |
+|  |  (AXP PMIC)  |    |  (RadioLib)  |    |   (ADC)      |        |
 |  +------+-------+    +------+-------+    +------+-------+        |
 |         |                   |                   |                 |
 |         +-------------------+-------------------+                 |
@@ -50,7 +50,7 @@ RadioLib uses a synchronous/blocking API. The entire cycle runs in `setup()`, th
 
 | Phase | Description | On Failure |
 |-------|-------------|------------|
-| 1. PMIC Setup | AXP192 init, enable LoRa power, disable GPS | Continue without PMIC |
+| 1. PMIC Setup | PMIC detect (AXP192/AXP2101), enable LoRa power, disable GPS | Continue without PMIC |
 | 2. Sensor Init | ADC attenuation, DS18B20 detection | Continue (default-temp fallback, flagged in payload) |
 | 3. Radio Init + Join/Restore | SX1262 init, restore session, OTAA activate | Sleep and retry |
 | 4. Battery Check | Read voltage, abort if critical | Extended sleep |
@@ -69,7 +69,7 @@ RadioLib uses a synchronous/blocking API. The entire cycle runs in `setup()`, th
                         |
                         v
                Phase 1: PMIC Setup
-              (AXP192 init, power rails)
+              (PMIC init, power rails)
                         |
                         v
                Phase 2: Sensor Init
@@ -119,32 +119,30 @@ RadioLib uses a synchronous/blocking API. The entire cycle runs in `setup()`, th
 
 ## 2. Module Documentation
 
-### 2.1 Power Management Module (AXP192)
+### 2.1 Power Management Module (AXP192 / AXP2101)
 
 **File:** `src/main.cpp`, function `setup_axp()`
 
-**Purpose:** Initialize the AXP192 power management IC for battery monitoring and power distribution.
+**Purpose:** Detect and initialize the power management IC (AXP192 on T-Beam v1.1, AXP2101 on v1.2) for battery monitoring and power distribution.
 
 **Configuration:**
 ```cpp
 #define USE_AXP_POWER_MANAGEMENT true
-// AXP192_SLAVE_ADDRESS is defined by XPowersLib (0x34)
+// AXP192_SLAVE_ADDRESS / AXP2101_SLAVE_ADDRESS defined by XPowersLib (both 0x34)
 ```
 
 **Initialization Sequence (XPowersLib v0.1.9 API):**
-1. Allocate `XPowersAXP192` object
-2. Initialize via `PMU->init(Wire, 21, 22, AXP192_SLAVE_ADDRESS)` — returns `bool`
-3. `PMU->enableLDO2()` — LoRa radio power
-4. `PMU->disableLDO3()` — GPS off, saves ~50mA
-5. `PMU->enableDC1()` — ESP32 core power
-6. `PMU->setChargeTargetVoltage(XPOWERS_AXP192_CHG_VOL_4V2)`
-7. `PMU->setChargerConstantCurr(XPOWERS_AXP192_CHG_CUR_100MA)`
+1. Try `XPowersAXP192::init(Wire, 21, 22, ...)`; on failure try `XPowersAXP2101::init(...)` (same I2C address, distinguished by chip ID)
+2. Enable the LoRa radio rail — `enableLDO2()` on AXP192, `enableALDO2()` on AXP2101
+3. Cut GPS power — `disableLDO3()` / `disableALDO3()` (saves ~50mA)
+4. `enableDC1()` — ESP32 core power
+5. `setChargeTargetVoltage(..._CHG_VOL_4V2)` / `setChargerConstantCurr(..._CHG_CUR_100MA)` with the chip-specific constants
 
 **Battery Monitoring:**
 - Critical threshold: 3200 mV (operation stops, enters sleep)
 - Low threshold: 3400 mV (sleep interval extended 2x)
 - Critical sleep multiplier: 4x normal interval
-- Reading: `PMU->getBattVoltage()` returns millivolts (uint16_t)
+- Reading: `pmic_batt_voltage()` wraps `getBattVoltage()` (millivolts) of whichever PMIC was detected
 
 ---
 
@@ -184,7 +182,7 @@ The ESP32 die temperature (`temprature_sens_read()`) is never used for the MC co
 
 **Purpose:** Persist RadioLib LoRaWAN session state across deep sleep and power cycles.
 
-RadioLib v7.6.0 uses two internal buffers:
+RadioLib uses two internal buffers:
 
 | Buffer | Size | Persistence | Changes |
 |--------|------|-------------|---------|
@@ -258,9 +256,9 @@ Where A and B are species-specific coefficients from FPL GTR-06 Table 1.
 
 ### 2.6 LoRaWAN Communication Module
 
-**Library:** RadioLib v7.6.0
+**Library:** RadioLib (pinned `^7.1.0`, resolves to 7.7.1 as of 2026-06-04)
 **Region:** EU433
-**Radio:** SX1262 (T-Beam v1.1)
+**Radio:** SX1262 (T-Beam v1.1/v1.2)
 **Payload Format:** Cayenne LPP
 
 **Radio Initialization:**
@@ -301,7 +299,7 @@ int txResult = node.sendReceive(data, len, fPort, downBuf, &downLen);
 
 ## 3. Memory Layout
 
-### 3.1 Build Size (RadioLib v7.6.0)
+### 3.1 Build Size (RadioLib pinned `^7.1.0`, resolves to 7.7.1 as of 2026-06-04)
 
 | Resource | Used | Available | % |
 |----------|------|-----------|---|
@@ -413,8 +411,8 @@ LDO3 (GPS power) is explicitly disabled during PMIC setup via `PMU->disableLDO3(
 ## 6. Firmware Versioning
 
 ```cpp
-#define FIRMWARE_VERSION_MAJOR 2
-#define FIRMWARE_VERSION_MINOR 0
+#define FIRMWARE_VERSION_MAJOR 1
+#define FIRMWARE_VERSION_MINOR 1
 #define FIRMWARE_VERSION_PATCH 0
 ```
 
@@ -437,7 +435,7 @@ Debug macros (config.h):
 ========================================
  Wood Moisture Sensor (LoRaWAN/RadioLib)
 ========================================
-Firmware v2.0.0
+Firmware v1.1.0
 Wake reason: Timer
 Woke from deep sleep.
 Selected species [0]: Douglas-Fir (Coast)

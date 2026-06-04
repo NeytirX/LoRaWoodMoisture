@@ -88,9 +88,9 @@ The firmware uses `ADC_11db` attenuation for full 0-3.3V range. Each measurement
 
 1. **Connect precision resistors** in place of the wood probe:
    ```
-   3.3V --[R_pullup 100k]--+--[R_test]-- GND
-                            |
-                         ADC GPIO32
+   GPIO25 --[R_pullup 100k]--+--[R_test]-- GND
+                              |
+                           ADC GPIO35
    ```
 
 2. **Test resistor values:**

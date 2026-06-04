@@ -21,7 +21,7 @@ This firmware is the consolidated version incorporating improvements from multip
 - **LoRaWAN Connectivity:** EU433 band, OTAA, Cayenne LPP payload format for IoT integration
 - **Session Persistence:** LoRaWAN nonces saved to NVS and session saved to RTC memory across deep sleep cycles (avoids costly OTAA rejoin every wake)
 - **Remote Configuration:** Downlink commands for adjusting measurement interval, wood species, TX power, and forcing rejoin
-- **Battery-Aware Power Management:** AXP192 PMIC integration with critical voltage protection and adaptive sleep intervals (2x/4x multiplier when battery is low/critical)
+- **Battery-Aware Power Management:** AXP192/AXP2101 PMIC integration (auto-detected, T-Beam v1.1/v1.2) with critical voltage protection and adaptive sleep intervals (2x/4x multiplier when battery is low/critical)
 - **Hardware Watchdog:** ESP32 Task Watchdog Timer prevents firmware hangs (120s timeout)
 - **Ultra-Low Power Design:** Deep sleep operation with configurable intervals (default: 1 hour)
 
@@ -41,8 +41,8 @@ This system was developed as part of a Master's thesis in Wood Technologies, foc
 
 | Component | Specification | Purpose |
 |-----------|---------------|---------|
-| TTGO T-Beam v1.1 | ESP32 + SX1262 LoRa | Main controller and radio |
-| AXP192 PMIC | Integrated on T-Beam | Power management and battery charging |
+| TTGO T-Beam v1.1/v1.2 | ESP32 + SX1262 LoRa | Main controller and radio |
+| AXP192 / AXP2101 PMIC | Integrated on T-Beam (auto-detected) | Power management and battery charging |
 | Resistive Moisture Probe | Two-electrode type | Wood moisture sensing |
 | 100k Pull-up Resistor | 1% tolerance recommended | Voltage divider reference |
 | Li-ion/LiPo Battery | 3.7V, 18650 or similar | Power source |
@@ -51,18 +51,21 @@ This system was developed as part of a Master's thesis in Wood Technologies, foc
 
 ```
 Moisture Probe:
-  - ADC Input: GPIO 32
-  - Power Control: GPIO 25
-  - Pull-up Resistor: 100k to 3.3V
+  - ADC Input: GPIO 35 (input-only ADC1; GPIO 32 is the radio BUSY line!)
+  - Power Control: GPIO 25 (drives the divider, HIGH only during measurement)
+  - Pull-up Resistor: 100k from GPIO 25 to the ADC node
 
 DS18B20 Temperature Sensor (optional):
   - Data: GPIO 14 (with 4.7k pull-up to 3.3V)
 
-LoRa (SX1262):
-  - CS/NSS: GPIO 5
-  - RESET: GPIO 27
+LoRa (SX1262, dedicated SPI bus):
+  - SCK: GPIO 5
+  - MISO: GPIO 19
+  - MOSI: GPIO 27
+  - CS/NSS: GPIO 18
+  - RESET: GPIO 23
   - DIO1: GPIO 33
-  - BUSY: GPIO 26
+  - BUSY: GPIO 32
 
 I2C (PMIC):
   - SDA: GPIO 21
@@ -124,7 +127,7 @@ I2C (PMIC):
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `MOISTURE_PROBE_ADC_PIN` | 32 | ADC input pin |
+| `MOISTURE_PROBE_ADC_PIN` | 35 | ADC input pin |
 | `MOISTURE_PROBE_POWER_PIN` | 25 | Power control pin |
 | `R_PULLUP_OHMS` | 100000.0f | Pull-up resistor value |
 | `ADC_SAMPLES_TO_AVERAGE` | 10 | Samples per reading |
@@ -198,14 +201,14 @@ The device transmits data using Cayenne Low Power Payload format:
 
 ### Sequential Boot-to-Sleep Design (8 Phases)
 
-The firmware uses RadioLib v7.6.0 with a synchronous/blocking API. The entire measure-send-sleep cycle runs once in `setup()`, then the ESP32 enters deep sleep. On wake, the ESP32 restarts and `setup()` runs again. `loop()` is never reached.
+The firmware uses RadioLib (pinned `^7.1.0`, resolves to 7.7.1 as of 2026-06-04) with a synchronous/blocking API. The entire measure-send-sleep cycle runs once in `setup()`, then the ESP32 enters deep sleep. On wake, the ESP32 restarts and `setup()` runs again. `loop()` is never reached.
 
 ```
 ESP32 Boot (reset / timer wake)
          |
          v
   Phase 1: PMIC Setup
-  (AXP192 init, enable LoRa power, disable GPS)
+  (PMIC detect AXP192/AXP2101, enable LoRa power, disable GPS)
          |
          v
   Phase 2: Sensor Init
@@ -257,9 +260,9 @@ ESP32 Boot (reset / timer wake)
 
 | Library | Version | Purpose |
 |---------|---------|---------|
-| RadioLib | ^7.1.0 | SX1262 LoRa radio driver + LoRaWAN stack |
+| RadioLib | `^7.1.0` (resolves to 7.7.1 as of 2026-06-04) | SX1262 LoRa radio driver + LoRaWAN stack |
 | CayenneLPP | ^1.6.0 | Low Power Payload encoding |
-| XPowersLib | ^0.1.9 | AXP192 PMIC control |
+| XPowersLib | ^0.1.9 | AXP192/AXP2101 PMIC control |
 | OneWire | ^2.3.8 | 1-Wire bus protocol |
 | DallasTemperature | ^3.11.0 | DS18B20 temperature sensor |
 
