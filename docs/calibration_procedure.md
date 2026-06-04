@@ -6,7 +6,7 @@ This document describes the calibration procedure for resistive wood moisture pr
 
 **Standard Reference:** FPL GTR-06 "Wood Handbook: Wood as an Engineering Material"
 **Application:** Master Thesis in Wood Technologies - Field Deployment Validation
-**Firmware Version:** 1.1.0
+**Firmware Version:** 1.1.1
 
 ---
 
@@ -244,7 +244,7 @@ The firmware uses bilinear interpolation of a 13x20 correction lookup table (sto
 
 ### 5.2 DS18B20 vs ESP32 Internal Temperature Comparison
 
-**Background:** The firmware v1.1.0 supports a DS18B20 1-Wire temperature sensor (on GPIO 14) for direct wood/ambient temperature measurement. When no valid DS18B20 reading is available, the MC correction uses `DEFAULT_WOOD_TEMP_CELSIUS` (21 C) and the uplink is flagged on LPP channel 7; the ESP32 internal chip temperature is only a debug signal (serial output and optional LPP channel 6), never a correction input.
+**Background:** The firmware (v1.1.0+) supports a DS18B20 1-Wire temperature sensor (on GPIO 14) for direct wood/ambient temperature measurement. When no valid DS18B20 reading is available, the MC correction uses `DEFAULT_WOOD_TEMP_CELSIUS` (21 C) and the uplink is flagged on LPP channel 7; the ESP32 internal chip temperature is only a debug signal (serial output and optional LPP channel 6), never a correction input.
 
 **Validation Procedure:**
 
@@ -274,7 +274,7 @@ The firmware uses bilinear interpolation of a 13x20 correction lookup table (sto
 Date: _______________
 Technician: _______________
 R_pullup (measured): _______________ Ohm
-Firmware Version: 1.1.0
+Firmware Version: 1.1.1
 
 Test Points:
 +----------------+-------------+-------------+-------------+

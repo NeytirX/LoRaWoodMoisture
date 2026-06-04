@@ -5,7 +5,7 @@
 This guide explains how to interpret moisture content data from the LoRaWAN Wood Moisture Monitoring System. It covers understanding raw vs. corrected values, identifying artifacts, statistical analysis methods, and drawing meaningful conclusions for thesis research.
 
 **Context:** Master Thesis in Wood Technologies
-**Data Source:** LoRaWAN-connected resistive moisture monitoring system (firmware v1.1.0)
+**Data Source:** LoRaWAN-connected resistive moisture monitoring system (firmware v1.1.1)
 
 ---
 
@@ -28,7 +28,7 @@ Each transmission contains the following fields (Cayenne LPP format):
 
 ### 1.2 Temperature Source
 
-Firmware v1.1.0 handles two cases:
+Firmware v1.1.0+ handles two cases:
 
 - **DS18B20 (preferred):** Direct wood/ambient temperature measurement via 1-Wire on GPIO 14. Accuracy +/-0.5 C. Used for temperature correction and sent on LPP channel 2.
 - **Fallback (no valid DS18B20 reading):** The MC correction uses `DEFAULT_WOOD_TEMP_CELSIUS` (21 C, where the FPL correction is ~0). Channel 2 is omitted and the fallback flag (LPP channel 7, digital) is set to 1. The ESP32 die temperature is never used for correction - it reads well above ambient due to chip self-heating.
@@ -751,7 +751,7 @@ MOISTURE MONITORING ANALYSIS REPORT
 Site: [Location Name]
 Period: [Start Date] to [End Date]
 Duration: [X] days
-Firmware: v1.1.0
+Firmware: v1.1.1
 Temperature Source: DS18B20 / ESP32 Internal
 
 1. EXECUTIVE SUMMARY

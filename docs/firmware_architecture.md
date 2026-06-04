@@ -413,7 +413,7 @@ LDO3 (GPS power) is explicitly disabled during PMIC setup via `PMU->disableLDO3(
 ```cpp
 #define FIRMWARE_VERSION_MAJOR 1
 #define FIRMWARE_VERSION_MINOR 1
-#define FIRMWARE_VERSION_PATCH 0
+#define FIRMWARE_VERSION_PATCH 1
 ```
 
 Version is printed at startup for debugging and deployment tracking.
@@ -435,7 +435,7 @@ Debug macros (config.h):
 ========================================
  Wood Moisture Sensor (LoRaWAN/RadioLib)
 ========================================
-Firmware v1.1.0
+Firmware v1.1.1
 Wake reason: Timer
 Woke from deep sleep.
 Selected species [0]: Douglas-Fir (Coast)

@@ -26,7 +26,7 @@
 // =============================================================================
 #define FIRMWARE_VERSION_MAJOR 1
 #define FIRMWARE_VERSION_MINOR 1
-#define FIRMWARE_VERSION_PATCH 0
+#define FIRMWARE_VERSION_PATCH 1
 
 // =============================================================================
 // POWER MANAGEMENT (AXP192 on T-Beam v1.1, AXP2101 on v1.2 - auto-detected)
