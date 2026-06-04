@@ -82,35 +82,39 @@ inline float read_esp_temperature_celsius() {
 }
 
 /**
- * Read wood temperature from DS18B20 if available, otherwise fall back to
- * ESP32 die temperature (with a warning).
+ * Read wood temperature from DS18B20 if available.
+ *
+ * Without a valid DS18B20 reading, falls back to DEFAULT_WOOD_TEMP_CELSIUS
+ * (~70F, where the FPL GTR-06 correction is zero) and sets is_fallback so
+ * the payload can flag the reading. The ESP32 die temperature is NOT used
+ * for the correction: it reads tens of degrees above ambient and would
+ * silently skew the corrected MC.
  *
  * For accurate temperature correction, mount the DS18B20 in the same probe
  * assembly as the moisture electrodes so it measures wood temperature directly.
  */
-inline float read_wood_temperature() {
+inline float read_wood_temperature(bool &is_fallback) {
     if (ds18b20_available) {
         ds18b20.requestTemperatures();
         float temp_c = ds18b20.getTempCByIndex(0);
 
         // Sanity check — DS18B20 returns DEVICE_DISCONNECTED_C (-127) on error
-        if (temp_c == DEVICE_DISCONNECTED_C || temp_c < -55.0f || temp_c > 125.0f) {
-            Serial.println(F("[Sensor] DS18B20 read error! Using fallback."));
-            return read_esp_temperature_celsius();
+        if (temp_c != DEVICE_DISCONNECTED_C && temp_c >= -55.0f && temp_c <= 125.0f) {
+            is_fallback = false;
+            Serial.print(F("[Sensor] DS18B20 temp: "));
+            Serial.print(temp_c);
+            Serial.println(F(" C"));
+            return temp_c;
         }
-
-        Serial.print(F("[Sensor] DS18B20 temp: "));
-        Serial.print(temp_c);
-        Serial.println(F(" C"));
-        return temp_c;
+        Serial.println(F("[Sensor] DS18B20 read error! Using default wood temp."));
     }
 
-    // Fallback
-    float esp_temp = read_esp_temperature_celsius();
-    Serial.print(F("[Sensor] ESP32 die temp (fallback): "));
-    Serial.print(esp_temp);
-    Serial.println(F(" C (WARNING: poor proxy for wood temp)"));
-    return esp_temp;
+    // Fallback: assume the default wood temperature instead of the die temp
+    is_fallback = true;
+    Serial.print(F("[Sensor] No valid wood temp. Using default: "));
+    Serial.print(DEFAULT_WOOD_TEMP_CELSIUS);
+    Serial.println(F(" C (fallback flagged in payload)"));
+    return DEFAULT_WOOD_TEMP_CELSIUS;
 }
 
 // =============================================================================

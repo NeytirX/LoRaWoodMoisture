@@ -284,7 +284,8 @@ void setup() {
     }
 
     // --- Temperature ---
-    last_wood_temp_c = read_wood_temperature();
+    bool wood_temp_fallback = false;
+    last_wood_temp_c = read_wood_temperature(wood_temp_fallback);
     last_esp_temp_c = read_esp_temperature_celsius();
     DEBUG_PRINT(F("Wood Temp: ")); DEBUG_PRINT(last_wood_temp_c); DEBUG_PRINTLN(F(" C"));
     DEBUG_PRINT(F("ESP32 Temp: ")); DEBUG_PRINT(last_esp_temp_c); DEBUG_PRINTLN(F(" C"));
@@ -318,10 +319,15 @@ void setup() {
     lpp.reset();
     if (last_mc_corrected >= 0 && last_mc_corrected <= 100)
         lpp.addAnalogInput(LPP_CHANNEL_WOOD_MC, last_mc_corrected);
-    if (last_wood_temp_c > -50 && last_wood_temp_c < 100)
+    // Only send wood temp when actually measured - never report the
+    // fallback default as a measurement
+    if (!wood_temp_fallback && last_wood_temp_c > -50 && last_wood_temp_c < 100)
         lpp.addTemperature(LPP_CHANNEL_WOOD_TEMP, last_wood_temp_c);
     if (last_battery_v > 0)
         lpp.addAnalogInput(LPP_CHANNEL_BATTERY_VOLTAGE, last_battery_v);
+    // Always sent: 1 = corrected MC used DEFAULT_WOOD_TEMP_CELSIUS, not a
+    // measured temp - lets downstream analysis filter affected readings
+    lpp.addDigitalInput(LPP_CHANNEL_TEMP_FALLBACK, wood_temp_fallback ? 1 : 0);
 
     // Optional debug channels (uncomment to include in payload)
     // if (last_mc_indicated >= 0)

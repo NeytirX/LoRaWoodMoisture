@@ -24,8 +24,8 @@
 // =============================================================================
 // FIRMWARE VERSION
 // =============================================================================
-#define FIRMWARE_VERSION_MAJOR 2
-#define FIRMWARE_VERSION_MINOR 0
+#define FIRMWARE_VERSION_MAJOR 1
+#define FIRMWARE_VERSION_MINOR 1
 #define FIRMWARE_VERSION_PATCH 0
 
 // =============================================================================
@@ -117,6 +117,7 @@
 #define LPP_CHANNEL_RESISTANCE      4  // Wood Resistance (kOhms)
 #define LPP_CHANNEL_BATTERY_VOLTAGE 5  // Battery Voltage (V)
 #define LPP_CHANNEL_ESP_TEMP        6  // ESP32 Internal Chip Temperature (C)
+#define LPP_CHANNEL_TEMP_FALLBACK   7  // Digital: 1 = no valid DS18B20 reading, MC corrected with DEFAULT_WOOD_TEMP_CELSIUS
 
 // =============================================================================
 // DOWNLINK COMMAND BYTES (for remote configuration via LoRaWAN downlink)
