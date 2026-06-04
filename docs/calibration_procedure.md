@@ -6,7 +6,7 @@ This document describes the calibration procedure for resistive wood moisture pr
 
 **Standard Reference:** FPL GTR-06 "Wood Handbook: Wood as an Engineering Material"
 **Application:** Master Thesis in Wood Technologies - Field Deployment Validation
-**Firmware Version:** 1.1.1
+**Firmware Version:** see `config.h` (printed in the boot banner)
 
 ---
 
@@ -274,7 +274,7 @@ The firmware uses bilinear interpolation of a 13x20 correction lookup table (sto
 Date: _______________
 Technician: _______________
 R_pullup (measured): _______________ Ohm
-Firmware Version: 1.1.1
+Firmware Version: _______________
 
 Test Points:
 +----------------+-------------+-------------+-------------+
