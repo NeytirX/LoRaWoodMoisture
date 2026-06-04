@@ -1,12 +1,12 @@
 .pio/
 .vscode/
-.kilo/
 *.bin
 *.elf
 *.map
 include/lorawan_keys.h
 
 # AI working docs (local-only, see docs/ai/project_structure.md)
+.claude/
 CLAUDE.md
 AGENTS.md
 STRATEGY.md
