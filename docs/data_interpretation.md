@@ -5,7 +5,7 @@
 This guide explains how to interpret moisture content data from the LoRaWAN Wood Moisture Monitoring System. It covers understanding raw vs. corrected values, identifying artifacts, statistical analysis methods, and drawing meaningful conclusions for thesis research.
 
 **Context:** Master Thesis in Wood Technologies
-**Data Source:** LoRaWAN-connected resistive moisture monitoring system (firmware version per `config.h`, printed at boot)
+**Data Source:** LoRaWAN-connected resistive moisture monitoring system
 
 ---
 

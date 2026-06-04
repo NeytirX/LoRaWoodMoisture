@@ -2,8 +2,6 @@
 
 ## Master Thesis Project in Wood Technologies
 
-**Firmware Version:** 1.1.1
-
 ---
 
 ## Project Overview

@@ -6,7 +6,6 @@ This document describes the calibration procedure for resistive wood moisture pr
 
 **Standard Reference:** FPL GTR-06 "Wood Handbook: Wood as an Engineering Material"
 **Application:** Master Thesis in Wood Technologies - Field Deployment Validation
-**Firmware Version:** see `config.h` (printed in the boot banner)
 
 ---
 

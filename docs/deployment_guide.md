@@ -35,7 +35,7 @@ This document provides comprehensive instructions for deploying the LoRaWAN Wood
 ### 1.2 Equipment Checklist
 
 **Required:**
-- [ ] TTGO T-Beam v1.1/v1.2 device with current firmware loaded (version per `config.h`, printed at boot)
+- [ ] TTGO T-Beam v1.1/v1.2 device with current firmware loaded
 - [ ] Moisture probe (2-electrode resistive type)
 - [ ] 100 kOhm pull-up resistor (1% tolerance, 1/4W)
 - [ ] Enclosure (IP65 or higher rating)
