@@ -5,6 +5,9 @@
 *.map
 include/lorawan_keys.h
 
+# Local bench tooling (kept out of the published firmware repo)
+src/ttn_test.cpp
+
 # AI working docs (local-only, see docs/ai/project_structure.md)
 .claude/
 CLAUDE.md
