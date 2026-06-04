@@ -51,7 +51,7 @@ RadioLib uses a synchronous/blocking API. The entire cycle runs in `setup()`, th
 | Phase | Description | On Failure |
 |-------|-------------|------------|
 | 1. PMIC Setup | AXP192 init, enable LoRa power, disable GPS | Continue without PMIC |
-| 2. Sensor Init | ADC attenuation, DS18B20 detection | Continue (fallback to ESP32 temp) |
+| 2. Sensor Init | ADC attenuation, DS18B20 detection | Continue (default-temp fallback, flagged in payload) |
 | 3. Radio Init + Join/Restore | SX1262 init, restore session, OTAA activate | Sleep and retry |
 | 4. Battery Check | Read voltage, abort if critical | Extended sleep |
 | 5. Sensor Measurement | Resistance, temperature, MC calculation | Continue with available data |
@@ -161,7 +161,9 @@ RadioLib uses a synchronous/blocking API. The entire cycle runs in `setup()`, th
 
 **Temperature Reading Priority:**
 1. DS18B20 (if detected) - direct wood temperature measurement
-2. ESP32 die temperature (`temprature_sens_read()`) - inaccurate fallback
+2. `DEFAULT_WOOD_TEMP_CELSIUS` (21 C) - fallback when no valid DS18B20 reading; the uplink is flagged on LPP channel 7 and the wood-temp channel is omitted
+
+The ESP32 die temperature (`temprature_sens_read()`) is never used for the MC correction - it reads tens of degrees above ambient. It remains available on debug LPP channel 6 and in the serial output.
 
 **Resistance Measurement (`read_wood_resistance_ohms()`):**
 - Probe power pin must already be HIGH (toggled by main code)
@@ -245,7 +247,7 @@ Where A and B are species-specific coefficients from FPL GTR-06 Table 1.
 
 **Algorithm:**
 
-1. Read wood temperature (DS18B20 primary, ESP32 die fallback)
+1. Read wood temperature (DS18B20 primary, `DEFAULT_WOOD_TEMP_CELSIUS` fallback)
 2. Convert to Fahrenheit: `T_F = T_C x 9/5 + 32`
 3. Constrain temperature to table range (0F - 120F)
 4. Constrain indicated MC to table range (6% - 25%)
@@ -388,7 +390,7 @@ LDO3 (GPS power) is explicitly disabled during PMIC setup via `PMU->disableLDO3(
 | ADC saturated high (>= 4094) | Return 1e12 ohm (open circuit) |
 | ADC near zero (< 1) | Return 1e-3 ohm (short circuit) |
 | Resistance out of range | Print warning, continue with reading |
-| DS18B20 read error | Fall back to ESP32 die temperature |
+| DS18B20 read error | Correct MC with `DEFAULT_WOOD_TEMP_CELSIUS`, flag uplink (LPP channel 7) |
 
 ### 5.2 LoRaWAN Errors
 

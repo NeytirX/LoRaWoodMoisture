@@ -228,7 +228,7 @@ The firmware uses bilinear interpolation of a 13x20 correction lookup table (sto
 3. **At each temperature:**
    - Wait 30 minutes for equilibrium
    - Record probe resistance
-   - Record DS18B20 reading (or ESP32 internal temperature)
+   - Record DS18B20 reading (or the chamber temperature if no DS18B20 is fitted)
    - Calculate indicated MC (without correction)
 
 4. **Compare with FPL correction:**
@@ -244,11 +244,11 @@ The firmware uses bilinear interpolation of a 13x20 correction lookup table (sto
 
 ### 5.2 DS18B20 vs ESP32 Internal Temperature Comparison
 
-**Background:** The firmware v1.1.0 supports a DS18B20 1-Wire temperature sensor (on GPIO 14) for direct wood/ambient temperature measurement. When a DS18B20 is not detected, it falls back to the ESP32 internal chip temperature sensor as a proxy.
+**Background:** The firmware v1.1.0 supports a DS18B20 1-Wire temperature sensor (on GPIO 14) for direct wood/ambient temperature measurement. When no valid DS18B20 reading is available, the MC correction uses `DEFAULT_WOOD_TEMP_CELSIUS` (21 C) and the uplink is flagged on LPP channel 7; the ESP32 internal chip temperature is only a debug signal (serial output and optional LPP channel 6), never a correction input.
 
 **Validation Procedure:**
 
-1. **With DS18B20 connected,** the firmware will automatically prefer it over the ESP32 internal sensor.
+1. **With DS18B20 connected,** the firmware automatically uses it for temperature correction.
 
 2. **Log both temperatures simultaneously:**
    ```cpp
@@ -261,11 +261,7 @@ The firmware uses bilinear interpolation of a 13x20 correction lookup table (sto
    - Compare DS18B20 reading with ESP32 internal reading
    - The ESP32 internal sensor typically reads 5-15 C higher than ambient due to chip self-heating
 
-4. **If using ESP32 internal only (no DS18B20):**
-   ```cpp
-   #define ESP_TEMP_OFFSET -2.5f  // Example correction
-   float T_wood = T_esp32 + ESP_TEMP_OFFSET;
-   ```
+4. **If no DS18B20 is fitted:** the firmware does not estimate wood temperature from the die sensor; it corrects MC with `DEFAULT_WOOD_TEMP_CELSIUS` and flags the uplink (LPP channel 7). For bench calibration at a known temperature, set `DEFAULT_WOOD_TEMP_CELSIUS` in `config.h` to the chamber temperature.
    Note: For best accuracy, installing a DS18B20 is strongly recommended.
 
 ---

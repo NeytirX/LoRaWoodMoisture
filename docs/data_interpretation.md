@@ -28,12 +28,12 @@ Each transmission contains the following fields (Cayenne LPP format):
 
 ### 1.2 Temperature Source
 
-Firmware v1.1.0 supports two temperature sources:
+Firmware v1.1.0 handles two cases:
 
-- **DS18B20 (preferred):** Direct wood/ambient temperature measurement via 1-Wire on GPIO 14. Accuracy +/-0.5 C. This is used for temperature correction when available.
-- **ESP32 internal sensor (fallback):** On-die temperature, typically reads 5-15 C above ambient due to chip self-heating. Used only when DS18B20 is not detected.
+- **DS18B20 (preferred):** Direct wood/ambient temperature measurement via 1-Wire on GPIO 14. Accuracy +/-0.5 C. Used for temperature correction and sent on LPP channel 2.
+- **Fallback (no valid DS18B20 reading):** The MC correction uses `DEFAULT_WOOD_TEMP_CELSIUS` (21 C, where the FPL correction is ~0). Channel 2 is omitted and the fallback flag (LPP channel 7, digital) is set to 1. The ESP32 die temperature is never used for correction - it reads well above ambient due to chip self-heating.
 
-When interpreting the `wood_temp` field, check whether a DS18B20 was installed. If only the ESP32 internal sensor was used, temperature correction accuracy is reduced.
+When interpreting readings, filter on channel 7: rows with `temp_fallback = 1` were corrected with the default temperature, not a measured one. If the true wood temperature was far from 21 C, re-correct the indicated MC offline or exclude those rows.
 
 ### 1.3 Key Relationships
 
@@ -199,7 +199,7 @@ def assess_data_quality(record):
 | Gradual drift | Probe corrosion | Recalibrate, replace probe |
 | Flat line | Device malfunction | Check device status |
 | Missing data | Network coverage issue or deep sleep extension | Gap analysis, interpolate if brief |
-| Sudden drop in temp | DS18B20 failure, fallback to ESP32 internal | Check temp field for discontinuity |
+| Missing temp + fallback flag = 1 | DS18B20 failure, MC corrected with default temp | Filter on channel 7, fix sensor |
 | Battery voltage plateau then drop | Battery-aware sleep activated | Normal behavior at end of life |
 
 **Example Artifact Detection:**

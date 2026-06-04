@@ -2,7 +2,7 @@
 
 ## Master Thesis Project in Wood Technologies
 
-**Firmware Version:** 1.0.1
+**Firmware Version:** 1.1.0
 
 ---
 
@@ -17,7 +17,7 @@ This firmware is the consolidated version incorporating improvements from multip
 - **Resistive Moisture Measurement:** Two-electrode resistive probe method following FPL GTR-06 guidelines
 - **Species-Specific Calibration:** Supports multiple wood species with dedicated coefficients (A, B parameters)
 - **Temperature Compensation:** Implements FPL GTR-06 Table 2 correction factors via bilinear interpolation
-- **DS18B20 Temperature Sensor:** Optional 1-Wire temperature probe for direct wood temperature measurement, with automatic fallback to ESP32 die temperature
+- **DS18B20 Temperature Sensor:** Optional 1-Wire temperature probe for direct wood temperature measurement; without a valid reading the MC correction uses a configured default temperature and the uplink is flagged
 - **LoRaWAN Connectivity:** EU433 band, OTAA, Cayenne LPP payload format for IoT integration
 - **Session Persistence:** LoRaWAN nonces saved to NVS and session saved to RTC memory across deep sleep cycles (avoids costly OTAA rejoin every wake)
 - **Remote Configuration:** Downlink commands for adjusting measurement interval, wood species, TX power, and forcing rejoin
@@ -181,13 +181,16 @@ The device transmits data using Cayenne Low Power Payload format:
 | Channel | Type | Description | Data Type |
 |---------|------|-------------|-----------|
 | 1 | Analog Input | Wood Moisture Content (%) | Float |
-| 2 | Temperature | Wood Temperature (C) | Float |
+| 2 | Temperature | Wood Temperature (C); omitted on temp fallback | Float |
 | 3 | Analog Input | Indicated MC (pre-correction) | Float |
 | 4 | Analog Input | Resistance (k) | Float |
 | 5 | Analog Input | Battery Voltage (V) | Float |
 | 6 | Temperature | ESP32 Internal Temp (C) | Float |
+| 7 | Digital Input | Temp fallback flag | 0/1 |
 
 **Note:** Channels 3, 4, and 6 are commented out by default to conserve payload space. Enable in `main.cpp` if needed for debugging.
+
+**Channel 7** is always sent: `1` means no valid DS18B20 reading was available, so the corrected MC was computed with the configured default wood temperature (`DEFAULT_WOOD_TEMP_CELSIUS`, 21 C) and channel 2 is omitted. Filter or re-correct these readings during analysis.
 
 ---
 

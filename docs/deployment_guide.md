@@ -132,7 +132,7 @@ DQ  (yellow)--> GPIO 14 (ONEWIRE_PIN)
 - Use the waterproof stainless steel probe variant for outdoor use
 - Place the DS18B20 sensor in direct contact with the wood surface, or insert into a small hole near the moisture electrodes
 - Secure with tape or silicone, then route the cable to the enclosure
-- The firmware auto-detects the DS18B20 at boot; if not found, it falls back to the ESP32 internal temperature sensor
+- The firmware auto-detects the DS18B20 at boot; if not found, the MC correction uses `DEFAULT_WOOD_TEMP_CELSIUS` and the uplink is flagged (LPP channel 7) so affected readings can be filtered
 
 ### 2.3 Enclosure Preparation
 
@@ -598,6 +598,7 @@ Schedule downlinks via your network server console (TTN: Applications -> Messagi
 | 4 | Resistance | kOhm |
 | 5 | Battery Voltage | V |
 | 6 | ESP32 Internal Temp | C |
+| 7 | Temp Fallback Flag (1 = corrected with default temp) | 0/1 |
 
 ### 8.3 Data Quality Checks
 
