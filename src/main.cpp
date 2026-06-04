@@ -1,22 +1,11 @@
 // src/main.cpp - Wood Moisture Sensor Firmware (LoRaWAN via RadioLib)
 //
-// Target: TTGO T-Beam v1.1 (ESP32 + SX1262 + AXP192)
-// LoRaWAN: RadioLib with EU433 band, OTAA
+// Target: TTGO T-Beam v1.1/v1.2 (ESP32 + SX1262 + AXP192/AXP2101)
+// LoRaWAN: RadioLib with EU433 band, OTAA.
 //
-// Improvements incorporated from idk claude code and idk3:
-//   [CRITICAL]  Switched from MCCI LMIC to RadioLib (LMIC doesn't support SX1262 or EU433)
-//   [CRITICAL]  LoRaWAN session persistence: nonces in NVS, session in RTC RAM
-//   [CRITICAL]  Fixed probe power management (state machine handles power cycling)
-//   [IMPORTANT] DS18B20 temperature sensor support (integrated probe, with fallback)
-//   [IMPORTANT] ADC attenuation configuration for full 0-3.3V range
-//   [IMPORTANT] Downlink command parsing (interval, species, force rejoin, TX power)
-//   [ENHANCE]   Battery-level-aware sleep intervals
-//   [ENHANCE]   Battery critical voltage check before measurement
-//   [ENHANCE]   Resistance range validation with warnings
-//   [ENHANCE]   Hardware watchdog timer (ESP32 TWDT)
-//   [ENHANCE]   GPS (LDO3) disabled to save ~50mA
-//   [ENHANCE]   Firmware version printing at boot
-//   [ENHANCE]   Correct XPowersLib v0.1.9 API usage
+// Single-file firmware: the whole measure-send-sleep cycle runs once in
+// setup(), then the ESP32 deep-sleeps and restarts on timer wake. loop() is
+// never reached. See docs/firmware_architecture.md for the phase breakdown.
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -33,7 +22,9 @@
 
 #ifdef USE_AXP_POWER_MANAGEMENT
 #include <XPowersAXP192.tpp>
-XPowersAXP192 *PMU = nullptr;
+#include <XPowersAXP2101.tpp>
+XPowersAXP192  *PMU192  = nullptr;  // T-Beam v1.1
+XPowersAXP2101 *PMU2101 = nullptr;  // T-Beam v1.2
 bool pmic_initialized = false;
 #endif
 
@@ -41,6 +32,7 @@ bool pmic_initialized = false;
 // FORWARD DECLARATIONS
 // =============================================================================
 void setup_axp();
+float pmic_batt_voltage();
 void deep_sleep_with_timer(uint32_t seconds);
 void print_wakeup_reason();
 float calculate_indicated_mc(float R_wood_ohms, const WoodSpecies& species);
@@ -166,12 +158,16 @@ void setup() {
     // =====================================================================
     DEBUG_PRINTLN(F("[Phase] Radio Init"));
 
+    // The T-Beam wires the LoRa modem to a dedicated SPI bus (not the ESP32
+    // default VSPI pins) - bind the default SPIClass to it before radio.begin()
+    SPI.begin(LORA_SCK_PIN, LORA_MISO_PIN, LORA_MOSI_PIN, LORA_CS_PIN);
+
     // Initialize the SX1262 radio
     int state = radio.begin();
     if (state != RADIOLIB_ERR_NONE) {
         DEBUG_PRINT(F("[Radio] Init FAILED, code: "));
         DEBUG_PRINTLN(state);
-        DEBUG_PRINTLN(F("Check wiring: CS=5, DIO1=33, RST=27, BUSY=26"));
+        DEBUG_PRINTLN(F("Check wiring: CS=18, DIO1=33, RST=23, BUSY=32"));
         // Sleep and retry on next wake
         deep_sleep_with_timer(LORAWAN_JOIN_RETRY_SLEEP_SECONDS);
         return; // won't reach here after deep_sleep_start
@@ -241,8 +237,8 @@ void setup() {
     // PHASE 4: Battery Check
     // =====================================================================
     #ifdef USE_AXP_POWER_MANAGEMENT
-    if (pmic_initialized && PMU) {
-        last_battery_v = PMU->getBattVoltage() / 1000.0f;
+    if (pmic_initialized) {
+        last_battery_v = pmic_batt_voltage();
         DEBUG_PRINT(F("[Battery] Voltage: ")); DEBUG_PRINT(last_battery_v); DEBUG_PRINTLN(F(" V"));
         if (last_battery_v < CRITICAL_BATTERY_THRESHOLD_V) {
             DEBUG_PRINTLN(F("[Battery] CRITICAL! Skipping measurement. Extended sleep."));
@@ -303,8 +299,8 @@ void setup() {
 
     // --- Battery Voltage (re-read for payload) ---
     #ifdef USE_AXP_POWER_MANAGEMENT
-    if (pmic_initialized && PMU) {
-        last_battery_v = PMU->getBattVoltage() / 1000.0f;
+    if (pmic_initialized) {
+        last_battery_v = pmic_batt_voltage();
         DEBUG_PRINT(F("Battery: ")); DEBUG_PRINT(last_battery_v); DEBUG_PRINTLN(F(" V"));
     }
     #endif
@@ -579,41 +575,56 @@ float bilinear_interpolation(float x, float y,
 // =============================================================================
 
 #ifdef USE_AXP_POWER_MANAGEMENT
+// Detect the PMIC (AXP192 on T-Beam v1.1, AXP2101 on v1.2), power the LoRa
+// rail, cut GPS power, and configure the charger.
 void setup_axp() {
-    DEBUG_PRINTLN(F("Init AXP192..."));
-    PMU = new XPowersAXP192();
-    if (!PMU) {
-        DEBUG_PRINTLN(F("PMU allocation failed"));
-        pmic_initialized = false;
-        return;
-    }
-    // XPowersLib v0.1.9 API: init() returns bool (true = success)
-    bool ok = PMU->init(Wire, 21, 22, AXP192_SLAVE_ADDRESS);
-    if (ok) {
-        DEBUG_PRINTLN(F("PMIC initialized OK."));
+    DEBUG_PRINTLN(F("Init PMIC (AXP192/AXP2101)..."));
+
+    // --- AXP192 (T-Beam v1.1) ---
+    PMU192 = new XPowersAXP192();
+    if (PMU192 && PMU192->init(Wire, 21, 22, AXP192_SLAVE_ADDRESS)) {
+        DEBUG_PRINTLN(F("PMIC: AXP192 (T-Beam v1.1) initialized OK."));
         pmic_initialized = true;
 
-        // Enable LoRa radio power (LDO2)
-        PMU->enableLDO2();
-
-        // Disable GPS power (LDO3) - saves ~50mA
-        PMU->disableLDO3();
-
-        // Keep DCDC1 enabled (ESP32 core power)
-        PMU->enableDC1();
-
-        // Clear any pending IRQs
-        PMU->clearIrqStatus();
-
-        // Configure battery charger
-        PMU->setChargeTargetVoltage(XPOWERS_AXP192_CHG_VOL_4V2);
-        PMU->setChargerConstantCurr(XPOWERS_AXP192_CHG_CUR_100MA);
-    } else {
-        DEBUG_PRINTLN(F("PMIC init failed!"));
-        delete PMU;
-        PMU = nullptr;
-        pmic_initialized = false;
+        PMU192->enableLDO2();    // LoRa radio power
+        PMU192->disableLDO3();   // GPS off - saves ~50mA
+        PMU192->enableDC1();     // ESP32 core power
+        PMU192->clearIrqStatus();
+        PMU192->setChargeTargetVoltage(XPOWERS_AXP192_CHG_VOL_4V2);
+        PMU192->setChargerConstantCurr(XPOWERS_AXP192_CHG_CUR_100MA);
+        return;
     }
+    delete PMU192;
+    PMU192 = nullptr;
+
+    // --- AXP2101 (T-Beam v1.2) ---
+    PMU2101 = new XPowersAXP2101();
+    if (PMU2101 && PMU2101->init(Wire, 21, 22, AXP2101_SLAVE_ADDRESS)) {
+        DEBUG_PRINTLN(F("PMIC: AXP2101 (T-Beam v1.2) initialized OK."));
+        pmic_initialized = true;
+
+        PMU2101->enableALDO2();  // LoRa radio power
+        PMU2101->disableALDO3(); // GPS off
+        PMU2101->enableDC1();    // ESP32 core power
+        PMU2101->clearIrqStatus();
+        PMU2101->setChargeTargetVoltage(XPOWERS_AXP2101_CHG_VOL_4V2);
+        PMU2101->setChargerConstantCurr(XPOWERS_AXP2101_CHG_CUR_100MA);
+        return;
+    }
+    delete PMU2101;
+    PMU2101 = nullptr;
+
+    DEBUG_PRINTLN(F("PMIC init failed! (no AXP192/AXP2101 found)"));
+    pmic_initialized = false;
+}
+
+/**
+ * Battery voltage in volts from whichever PMIC was detected (-1 if none).
+ */
+float pmic_batt_voltage() {
+    if (PMU192)  return PMU192->getBattVoltage() / 1000.0f;
+    if (PMU2101) return PMU2101->getBattVoltage() / 1000.0f;
+    return -1.0f;
 }
 #endif
 

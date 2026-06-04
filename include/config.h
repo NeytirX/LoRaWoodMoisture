@@ -29,16 +29,18 @@
 #define FIRMWARE_VERSION_PATCH 0
 
 // =============================================================================
-// POWER MANAGEMENT (AXP192 - T-Beam v1.1)
+// POWER MANAGEMENT (AXP192 on T-Beam v1.1, AXP2101 on v1.2 - auto-detected)
 // =============================================================================
 #define USE_AXP_POWER_MANAGEMENT true
-// Note: AXP192_SLAVE_ADDRESS is defined by XPowersLib in AXP192Constants.h
-// Do NOT redefine it here.
+// Note: AXP192_SLAVE_ADDRESS / AXP2101_SLAVE_ADDRESS are defined by XPowersLib.
+// Do NOT redefine them here.
 
 // =============================================================================
 // WOOD MOISTURE SENSOR (RESISTIVE PROBE)
 // =============================================================================
-#define MOISTURE_PROBE_ADC_PIN   32
+// NOTE: GPIO 32 is the SX1262 BUSY line on the T-Beam - do not use it here.
+// GPIO 35 is ADC1_CH7, input-only, free on the T-Beam header.
+#define MOISTURE_PROBE_ADC_PIN   35
 #define MOISTURE_PROBE_POWER_PIN 25
 #define ADC_READ_STABILIZATION_MS 100
 #define ADC_SAMPLES_TO_AVERAGE    10
@@ -72,13 +74,19 @@
 #define DS18B20_READ_TIMEOUT_MS  1000     // Max wait for conversion
 
 // =============================================================================
-// LORA RADIO PINS (SX1262 on T-Beam v1.1)
+// LORA RADIO PINS (SX1262 on T-Beam v1.1/v1.2)
 // =============================================================================
-#define LORA_CS_PIN   5   // NSS / SPI Chip Select
-#define LORA_RST_PIN  27  // RESET
+// The T-Beam wires the LoRa modem to a dedicated SPI bus - these are NOT the
+// ESP32 default VSPI pins. main.cpp must call
+// SPI.begin(LORA_SCK_PIN, LORA_MISO_PIN, LORA_MOSI_PIN, LORA_CS_PIN)
+// before radio.begin(), otherwise the SX1262 never responds (CHIP_NOT_FOUND).
+#define LORA_SCK_PIN  5   // SPI clock
+#define LORA_MISO_PIN 19  // SPI MISO
+#define LORA_MOSI_PIN 27  // SPI MOSI
+#define LORA_CS_PIN   18  // NSS / SPI Chip Select
+#define LORA_RST_PIN  23  // RESET
 #define LORA_DIO1_PIN 33  // DIO1 (IRQ)
-#define LORA_BUSY_PIN 26  // BUSY
-// SPI pins (SCK=18, MISO=19, MOSI=23) handled by default SPIClass instance.
+#define LORA_BUSY_PIN 32  // BUSY
 
 // =============================================================================
 // OPERATIONAL INTERVALS

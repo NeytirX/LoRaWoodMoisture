@@ -57,7 +57,7 @@ inline void sensor_init() {
         Serial.println(F(" bits"));
     } else {
         ds18b20_available = false;
-        Serial.println(F("[Sensor] DS18B20 NOT found. Using ESP32 die temp as fallback."));
+        Serial.println(F("[Sensor] DS18B20 NOT found. MC correction will use default temp (flagged in payload)."));
     }
 }
 
