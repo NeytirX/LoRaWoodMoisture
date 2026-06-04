@@ -202,9 +202,9 @@ RadioLib uses two internal buffers:
 - `session_restore_rtc()` — Called on warm boot before `activateOTAA()`
 - `session_invalidate()` — Called on force-rejoin downlink or cold boot
 
-**Magic Number Validation:**
-- Uses `0xCAFE2345` magic to verify RTC memory contains valid session data
-- If magic doesn't match, forces fresh OTAA join
+**Validity Tracking:**
+- A plain `RTC_DATA_ATTR bool rtc_session_valid` flag marks whether the RTC session buffer holds restorable data (RTC RAM zeroes on power-on reset, so the flag starts false on cold boot)
+- If the flag is false, `session_restore_rtc()` reports no session and `activateOTAA()` performs a fresh join
 
 ---
 
@@ -328,7 +328,8 @@ RTC_DATA_ATTR bool lorawan_joined;
 RTC_DATA_ATTR uint32_t current_interval_seconds;
 RTC_DATA_ATTR uint8_t join_retry_count;
 RTC_DATA_ATTR uint8_t selected_species_index;       // Changeable via downlink
-RTC_DATA_ATTR RadioLibSessionData rtc_session;       // Session buffer + magic
+RTC_DATA_ATTR bool rtc_session_valid;               // session_manager.h
+RTC_DATA_ATTR uint8_t rtc_session_buf[RADIOLIB_LORAWAN_SESSION_BUF_SIZE];  // session_manager.h
 ```
 
 ---
