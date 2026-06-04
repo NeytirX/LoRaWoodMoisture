@@ -1,9 +1,5 @@
 # LoRaWAN Wood Moisture Monitoring System
 
-## Master Thesis Project in Wood Technologies
-
----
-
 ## Project Overview
 
 This project implements a low-power, LoRaWAN-connected wood moisture monitoring system designed for long-term deployment in wood technology research and industrial applications. The system uses resistive probe technology based on the USDA Forest Products Laboratory (FPL) GTR-06 standard for accurate moisture content determination.
