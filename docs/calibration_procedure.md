@@ -39,16 +39,17 @@ Coefficients A and B vary by wood species due to differences in:
 - Cellular structure
 - Grain orientation
 
-**Example Coefficients (FPL GTR-6 Table 1):**
+**Coefficients (fitted from FPL-GTR-6 / James 1988 Table 1, 7-25% MC):**
 
 | Species | A | B | Valid Range (% MC) |
 |---------|---|---|-------------------|
-| Douglas-Fir (Coast) | 1.725 | -0.02820 | 6-25 |
-| Southern Yellow Pine | 1.806 | -0.02994 | 6-25 |
-| Sitka Spruce | 1.621 | -0.02641 | 6-25 |
-| Red Oak | 1.912 | -0.03218 | 6-25 |
+| Douglas-Fir (Coast) | 1.7003 | -0.12007 | 7-25 |
+| Oak, White | 1.6691 | -0.11800 | 7-25 |
+| Oak, Northern Red | 1.7078 | -0.12209 | 7-25 |
+| Ash, Black | 1.6213 | -0.11454 | 7-25 |
+| Walnut, Black | 1.6676 | -0.11069 | 7-25 |
 
-> **Caution:** the coefficients above are illustrative placeholders (see `docs/ai/issues.md` #11); they do not reproduce real resistance-MC behavior. Thesis coefficients come from the M3 regression (§6.2), backed by James (1988) and additional literature.
+> **Note:** these are literature seeds, not this project's calibration. Table 1 is measured at 80 F (the correction grid is referenced to 70 F, a ~0.5% MC offset), the species are North American, and Beech is a placeholder (not in Table 1). The thesis coefficients come from the M3 regression (§6.2); see `include/wood_species_data.h` and `docs/ai/issues.md` #11.
 
 All species coefficients are stored in `include/wood_species_data.h`. The active species is selected at compile time via `SELECTED_WOOD_SPECIES_INDEX` in `include/config.h`, or at runtime via a LoRaWAN downlink command (`DOWNLINK_CMD_SET_SPECIES`, 0x02).
 

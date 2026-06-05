@@ -24,6 +24,12 @@
 #define pgm_read_float(addr) (*(reinterpret_cast<const float *>(addr)))
 #endif
 
+// memcpy_P is a plain memcpy off-target (PROGMEM is ordinary RAM here).
+#include <cstring>
+#ifndef memcpy_P
+#define memcpy_P(dest, src, n) memcpy((dest), (src), (n))
+#endif
+
 // The math uses log10/pow; pull them into the global namespace like the core does.
 using std::log10;
 using std::pow;

@@ -812,13 +812,16 @@ D. Firmware Configuration (species index, interval, etc.)
 
 ### A.2 Species Coefficients Quick Reference
 
+Fitted from FPL-GTR-6 (James 1988) Table 1 over 7-25% MC; see `include/wood_species_data.h` for provenance and caveats (80 F basis, North American stock, Beech placeholder).
+
 | Species | A | B |
 |---------|---|---|
-| Douglas-Fir (Coast) | 1.725 | -0.02820 |
-| Southern Yellow Pine | 1.806 | -0.02994 |
-| Sitka Spruce | 1.621 | -0.02641 |
-| Red Oak | 1.912 | -0.03218 |
-| Sugar Maple | 1.850 | -0.03100 |
+| Douglas-Fir (Coast) | 1.7003 | -0.12007 |
+| Oak, White | 1.6691 | -0.11800 |
+| Oak, Northern Red | 1.7078 | -0.12209 |
+| Ash, Black | 1.6213 | -0.11454 |
+| Walnut, Black | 1.6676 | -0.11069 |
+| Beech (placeholder) | 1.6665 | -0.11633 |
 
 ### A.3 Python Functions
 

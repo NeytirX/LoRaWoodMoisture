@@ -149,7 +149,7 @@ Send downlink messages on any port to reconfigure the device:
 | Command | Byte Format | Description |
 |---------|-------------|-------------|
 | Set Interval | `0x01 HH LL` | Set measurement interval (HH:LL = minutes, big-endian uint16) |
-| Set Species | `0x02 XX` | Set wood species index (XX = 0-6) |
+| Set Species | `0x02 XX` | Set wood species index (XX = 0 to NUM_WOOD_SPECIES-1) |
 | Force Rejoin | `0x03` | Force a fresh OTAA join on next wake |
 | Set TX Power | `0x04 XX` | Set TX power index |
 

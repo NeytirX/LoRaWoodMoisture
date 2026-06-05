@@ -49,6 +49,22 @@ static void test_mc_monotonically_decreasing_in_resistance(void) {
     }
 }
 
+static void test_mc_real_species_golden(void) {
+    // Golden values against the FPL-GTR-6 Table 1 fits (wood_species_data.h,
+    // 2026-06-05). Index 0 = Douglas-Fir (Coast), A=1.7003 B=-0.12007.
+    // Round-trips the table: 1 MOhm -> ~22 %, 10 MOhm -> ~16.6 % MC.
+    WoodSpecies douglas;
+    memcpy_P(&douglas, &species_data[0], sizeof(WoodSpecies));
+    TEST_ASSERT_FLOAT_WITHIN(0.05f, 21.88f, wood_mc::calculate_indicated_mc(1.0e6f, douglas));
+    TEST_ASSERT_FLOAT_WITHIN(0.05f, 16.60f, wood_mc::calculate_indicated_mc(1.0e7f, douglas));
+    // Every shipped species must have a physically sane slope (B in -0.13..-0.10).
+    for (int i = 0; i < NUM_WOOD_SPECIES; i++) {
+        WoodSpecies s;
+        memcpy_P(&s, &species_data[i], sizeof(WoodSpecies));
+        TEST_ASSERT_TRUE_MESSAGE(s.B < -0.10f && s.B > -0.13f, "species B out of sane range");
+    }
+}
+
 static void test_mc_matches_closed_form(void) {
     // M = 10^(A + B*log10(R_kOhms)); at R = 1 kOhm the log term vanishes: M = 10^A
     TEST_ASSERT_FLOAT_WITHIN(0.01f, pow(10.0f, 1.6f),
@@ -158,6 +174,7 @@ int main(int, char**) {
     RUN_TEST(test_mc_clamps_short_circuit_wet);
     RUN_TEST(test_mc_clamps_open_circuit_dry);
     RUN_TEST(test_mc_monotonically_decreasing_in_resistance);
+    RUN_TEST(test_mc_real_species_golden);
     RUN_TEST(test_mc_matches_closed_form);
     RUN_TEST(test_bilinear_reproduces_plane_at_nodes);
     RUN_TEST(test_bilinear_is_exact_on_plane_interior);
