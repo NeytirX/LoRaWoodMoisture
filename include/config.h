@@ -15,6 +15,9 @@
 // DEBUG OPTIONS
 // =============================================================================
 #define SERIAL_BAUD 115200
+// Set to 0 for deployment builds: skips the boot serial-ready wait that idles
+// at full power every wake cycle (significant long-term battery cost).
+#define DEBUG_MODE 1
 #define DEBUG_PRINTLN(x) Serial.println(x)
 #define DEBUG_PRINT(x)   Serial.print(x)
 // Uncomment to disable all debug prints (saves flash/RAM in release builds):

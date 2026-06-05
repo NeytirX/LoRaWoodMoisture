@@ -82,9 +82,12 @@ float last_esp_temp_c    = -100.0f;
 // =============================================================================
 void setup() {
     Serial.begin(SERIAL_BAUD);
-    // TODO: For production deployments, remove or wrap this 2-second delay in a debug flag.
-    // Idling at full power every wake cycle significantly degrades long-term battery life.
+#if DEBUG_MODE
+    // Wait up to 2 s for the serial port so debug boot logs are not lost.
+    // Skipped in deployment builds (DEBUG_MODE 0): idling at full power every
+    // wake cycle significantly degrades long-term battery life.
     while (!Serial && millis() < 2000);
+#endif
     DEBUG_PRINTLN(F("\n========================================"));
     DEBUG_PRINTLN(F(" Wood Moisture Sensor (LoRaWAN/RadioLib)"));
     DEBUG_PRINTLN(F("========================================"));
