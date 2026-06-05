@@ -100,6 +100,9 @@ void setup() {
     print_wakeup_reason();
 
     // --- Watchdog Timer ---
+    // (timeout, bool) is the Arduino-ESP32 v2.x signature - pins us to the
+    // current platform; see the platform note in platformio.ini before
+    // upgrading (replacement: esp_task_wdt_config_t struct init).
     esp_task_wdt_init(WATCHDOG_TIMEOUT_SECONDS, true);
     esp_task_wdt_add(NULL);
     DEBUG_PRINT(F("[WDT] Enabled. Timeout: "));

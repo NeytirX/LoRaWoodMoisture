@@ -150,9 +150,11 @@ The critical-battery read runs right after PMIC init (before the expensive radio
 
 ### 2.2 Sensor Layer Module
 
-**File:** `include/sensor.h`
+**File:** `include/sensor.h` (header-only, single-TU)
 
 **Purpose:** Abstraction layer for all sensor operations - ADC initialization, DS18B20 temperature, resistive moisture measurement, and resistance validation.
+
+This header defines `static` driver objects at header scope, so it must be included from `src/main.cpp` only. A second includer produces duplicate-symbol or split-state bugs (see `technical_debt.md` > Code structure).
 
 **Initialization (`sensor_init()`):**
 1. Set ADC attenuation to ADC_11db (0-3.3V full range)
@@ -180,9 +182,11 @@ The ESP32 die temperature (`temprature_sens_read()`) is never used for the MC co
 
 ### 2.3 Session Manager Module
 
-**File:** `include/session_manager.h`
+**File:** `include/session_manager.h` (header-only, single-TU)
 
 **Purpose:** Persist RadioLib LoRaWAN session state across deep sleep and power cycles.
+
+This header defines `RTC_DATA_ATTR` globals at header scope, so it must be included from `src/main.cpp` only. A second includer produces duplicate-symbol or split-state bugs (see `technical_debt.md` > Code structure).
 
 RadioLib uses two internal buffers:
 

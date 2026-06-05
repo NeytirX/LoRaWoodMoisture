@@ -1,5 +1,8 @@
 // include/sensor.h — Sensor Abstraction Layer (Wood Moisture + Temperature)
 //
+// SINGLE-TU ONLY: defines static driver objects at header scope. Include from
+// src/main.cpp only — a second includer causes duplicate-symbol / split-state bugs.
+//
 // Manages:
 //   - DS18B20 temperature sensor (1-Wire), with fallback to ESP32 die temp
 //   - Resistive wood moisture probe (voltage divider + ADC)
@@ -15,6 +18,8 @@
 #include "config.h"
 
 // ESP32 internal temperature sensor (undocumented but available)
+// Pins us to the current espressif32 platform - see the platform note in
+// platformio.ini before upgrading (replacement: IDF temperature sensor driver).
 #ifdef __cplusplus
 extern "C" {
 #endif

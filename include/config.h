@@ -1,8 +1,8 @@
 // config.h - Project Configuration File (LoRaWAN Wood Moisture Version)
 //
-// Consolidated configuration for the wood moisture sensor firmware.
-// Uses RadioLib (SX1262 + EU433) instead of MCCI LMIC.
-// Incorporates improvements from idk claude code and idk3.
+// Every tunable parameter for the wood moisture sensor firmware:
+// pins, thresholds, intervals, LPP channels, and downlink command bytes.
+// Uses RadioLib (SX1262 + EU433).
 
 #ifndef CONFIG_H
 #define CONFIG_H

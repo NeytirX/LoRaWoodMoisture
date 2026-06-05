@@ -1,5 +1,8 @@
 // include/session_manager.h — LoRaWAN Session Persistence (RadioLib v7.6.0)
 //
+// SINGLE-TU ONLY: defines RTC_DATA_ATTR globals at header scope. Include from
+// src/main.cpp only — a second includer causes duplicate-symbol / split-state bugs.
+//
 // Saves and restores RadioLib LoRaWAN session buffers across ESP32 deep sleep
 // and power cycles, avoiding a costly OTAA rejoin on every wake.
 //
