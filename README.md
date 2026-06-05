@@ -136,10 +136,11 @@ I2C (PMIC):
 |-----------|---------|-------------|
 | `NORMAL_SEND_INTERVAL_SECONDS` | 3600 | Measurement interval (1 hour) |
 | `LORAWAN_JOIN_MAX_RETRIES` | 5 | Max join attempts |
-| `LORAWAN_MAX_TX_RETRIES` | 3 | Max TX retries per packet |
-| `BATTERY_CRITICAL_MV` | 3200 | Critical cutoff voltage (mV) |
+| `CRITICAL_BATTERY_THRESHOLD_V` | 3.2 | Critical cutoff threshold (V) |
 | `LOW_BATTERY_THRESHOLD_V` | 3.4 | Extended sleep threshold (V) |
 | `WATCHDOG_TIMEOUT_SECONDS` | 120 | Watchdog timer (seconds) |
+
+Each wake cycle sends exactly one uplink (single-TX-per-cycle design): the firmware performs a single `sendReceive()` with no retry loop. A failed uplink is intentionally dropped and the device sleeps until the next measurement; for an hourly cadence a missed reading is acceptable, and skipping retries saves the battery and air-time they would cost.
 
 ### Downlink Commands (Remote Configuration)
 

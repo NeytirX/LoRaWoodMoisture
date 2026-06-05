@@ -326,7 +326,6 @@ Large constant data structures are stored in flash (PROGMEM) to conserve RAM:
 Variables preserved across deep sleep:
 
 ```cpp
-RTC_DATA_ATTR bool lorawan_joined;
 RTC_DATA_ATTR uint32_t current_interval_seconds;
 RTC_DATA_ATTR uint8_t join_retry_count;
 RTC_DATA_ATTR uint8_t selected_species_index;       // Changeable via downlink

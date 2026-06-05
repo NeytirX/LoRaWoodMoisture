@@ -60,7 +60,6 @@ LoRaWANNode node(&radio, &EU433);
 // =============================================================================
 // RTC-PERSISTENT VARIABLES (survive deep sleep)
 // =============================================================================
-RTC_DATA_ATTR bool lorawan_joined = false;
 RTC_DATA_ATTR uint32_t current_interval_seconds = NORMAL_SEND_INTERVAL_SECONDS;
 RTC_DATA_ATTR uint8_t join_retry_count = 0;
 RTC_DATA_ATTR uint8_t selected_species_index = SELECTED_WOOD_SPECIES_INDEX;
@@ -112,7 +111,6 @@ void setup() {
     bool cold_boot = (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) || (wakeup_reason == 0);
     if (cold_boot) {
         DEBUG_PRINTLN(F("Cold boot or reset. Full initialization."));
-        lorawan_joined = false;
         join_retry_count = 0;
 
         Preferences prefs;
@@ -223,11 +221,9 @@ void setup() {
 
     if (state == RADIOLIB_LORAWAN_SESSION_RESTORED) {
         DEBUG_PRINTLN(F("[LoRaWAN] Session restored from saved state!"));
-        lorawan_joined = true;
         join_retry_count = 0;
     } else if (state == RADIOLIB_LORAWAN_NEW_SESSION) {
         DEBUG_PRINTLN(F("[LoRaWAN] New session - fresh join successful!"));
-        lorawan_joined = true;
         join_retry_count = 0;
 
         // Save the new nonces to NVS (they only change on join)
@@ -238,7 +234,6 @@ void setup() {
     } else {
         DEBUG_PRINT(F("[LoRaWAN] Activation FAILED, code: "));
         DEBUG_PRINTLN(state);
-        lorawan_joined = false;
         join_retry_count++;
 
         if (join_retry_count >= LORAWAN_JOIN_MAX_RETRIES) {
@@ -469,7 +464,6 @@ void process_downlink(uint8_t *data, uint8_t len) {
         case DOWNLINK_CMD_FORCE_REJOIN:
             DEBUG_PRINTLN(F("  [DL] Force rejoin requested"));
             session_invalidate();
-            lorawan_joined = false;
             join_retry_count = 0;
             break;
 

@@ -100,8 +100,6 @@
 // =============================================================================
 // BATTERY-AWARE SLEEP
 // =============================================================================
-#define BATTERY_CRITICAL_MV            3200    // 3.2V cutoff - stop operation
-#define BATTERY_LOW_MV                 3500    // 3.5V warning
 #define LOW_BATTERY_THRESHOLD_V        3.4f    // Below this, extend sleep to conserve power
 #define CRITICAL_BATTERY_THRESHOLD_V   3.2f    // Below this, sleep even longer
 #define LOW_BATTERY_SLEEP_MULTIPLIER   2       // 2x normal interval when low
@@ -112,7 +110,6 @@
 // =============================================================================
 #define LORAWAN_JOIN_MAX_RETRIES          5
 #define LORAWAN_JOIN_RETRY_SLEEP_SECONDS  30
-#define LORAWAN_MAX_TX_RETRIES            3   // App-level retries per packet
 
 // =============================================================================
 // WATCHDOG TIMER
