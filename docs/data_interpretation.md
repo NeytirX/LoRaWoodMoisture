@@ -50,7 +50,7 @@ ADC Reading -> Resistance -> Indicated MC -> Temperature Correction -> Corrected
    R_wood = R_pullup * (ADC / (4095 - ADC))
    ```
 
-2. **Indicated MC (FPL GTR-06):**
+2. **Indicated MC (FPL GTR-6):**
    ```
    MC_indicated = 10^(A + B * log10(R_kOhm))
    ```
@@ -59,7 +59,7 @@ ADC Reading -> Resistance -> Indicated MC -> Temperature Correction -> Corrected
    ```
    MC_corrected = MC_indicated + C_t(T, MC_indicated)
    ```
-   Where C_t is obtained by bilinear interpolation of the FPL GTR-06 correction table.
+   Where C_t is obtained by bilinear interpolation of the FPL GTR-6 correction table.
 
 ### 1.4 Expected Value Ranges
 
@@ -86,7 +86,9 @@ Wood electrical resistance varies with temperature:
 - Winter readings appear artificially high
 - Seasonal trends are distorted
 
-### 2.2 Correction Factor Table (FPL GTR-06)
+### 2.2 Correction Factor Table (FPL GTR-6)
+
+> **WARNING (under review):** the sign convention below is suspected inverted relative to physics - cold wood reads *low* and should get a *positive* correction, warm wood the opposite. Pending re-transcription from the original FPL-GTR-6 chart; see the warning in `include/wood_temp_correction_data.h`. Do not use these values for thesis data until resolved.
 
 Correction values (C_t) to **add** to indicated MC:
 
@@ -823,7 +825,7 @@ D. Firmware Configuration (species index, interval, etc.)
 import numpy as np
 
 def mc_from_resistance(r_kohms, A, B):
-    """Calculate MC from resistance using FPL GTR-06 formula"""
+    """Calculate MC from resistance using FPL GTR-6 formula"""
     return 10 ** (A + B * np.log10(r_kohms))
 
 def resistance_from_mc(mc, A, B):

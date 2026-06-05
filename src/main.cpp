@@ -527,7 +527,7 @@ float calculate_indicated_mc(float R_wood_ohms, const WoodSpecies& species) {
 }
 
 // =============================================================================
-// TEMPERATURE CORRECTION (FPL GTR-06 Table 2)
+// TEMPERATURE CORRECTION (FPL GTR-6 Table 2)
 // =============================================================================
 float get_temperature_correction(float indicated_mc, float wood_temp_celsius) {
     if (!ENABLE_TEMPERATURE_COMPENSATION) return 0.0f;

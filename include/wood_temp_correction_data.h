@@ -1,13 +1,19 @@
 // include/wood_temp_correction_data.h
-// Stores temperature correction data for wood moisture content based on FPL GTR-06, Table 2.
+// Stores temperature correction data for wood moisture content based on FPL-GTR-6 (James 1988), Table 2.
 // Values are C_t (% MC) to be *added* to the indicated MC.
+//
+// WARNING (docs/ai/issues.md #9): the sign convention below is suspected INVERTED
+// relative to physics: cold wood reads low and needs a POSITIVE correction, warm
+// wood reads high and needs a negative one. Magnitudes match the chart scale; the
+// signs do not. Re-transcribe from the original FPL-GTR-6 chart before any thesis
+// data collection.
 
 #ifndef WOOD_TEMP_CORRECTION_DATA_H
 #define WOOD_TEMP_CORRECTION_DATA_H
 
 #include <Arduino.h>
 
-// --- TEMPERATURE CORRECTION TABLE (FPL GTR-06, Table 2) ---
+// --- TEMPERATURE CORRECTION TABLE (FPL GTR-6, Table 2) ---
 // Table indices for temperature and indicated moisture content.
 // Temperatures are in Fahrenheit.
 
@@ -15,14 +21,14 @@
 const float temp_points_f[] PROGMEM = {
     0.0f, 10.0f, 20.0f, 30.0f, 40.0f, 50.0f, 60.0f, 70.0f, 
     80.0f, 90.0f, 100.0f, 110.0f, 120.0f
-    // Note: FPL GTR-06 table goes up to 250°F. For typical ambient, 120°F is a reasonable upper bound for this array.
+    // Note: FPL GTR-6 table goes up to 250°F. For typical ambient, 120°F is a reasonable upper bound for this array.
     // If higher temps are needed, extend this array and the correction_table below.
 };
 const int TEMP_POINTS_COUNT = sizeof(temp_points_f) / sizeof(float);
 
 // Indicated Moisture Content (%) for columns in the table
 const float mc_points_indicated[] PROGMEM = {
-    // Using a subset of FPL GTR-06 Table 2 columns for practicality.
+    // Using a subset of FPL GTR-6 Table 2 columns for practicality.
     // Original table has columns for MC 6% to 30% (and sometimes beyond).
     // We will interpolate between these.
     6.0f,  7.0f,  8.0f,  9.0f,  10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 
@@ -36,7 +42,7 @@ const int MC_POINTS_COUNT = sizeof(mc_points_indicated) / sizeof(float);
 
 // Correction values C_t (% MC) to be added.
 // Rows: Temperature Index, Columns: Indicated MC Index
-// Data from FPL GTR-06, Table 2. Values are approximate and transcribed.
+// Data from FPL GTR-6, Table 2. Values are approximate and transcribed.
 // Verify against the original document for highest accuracy.
 // This is a large table, so using PROGMEM is essential.
 const float correction_table[TEMP_POINTS_COUNT][MC_POINTS_COUNT] PROGMEM = {

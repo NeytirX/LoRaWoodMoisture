@@ -90,7 +90,7 @@ inline float read_esp_temperature_celsius() {
  * Read wood temperature from DS18B20 if available.
  *
  * Without a valid DS18B20 reading, falls back to DEFAULT_WOOD_TEMP_CELSIUS
- * (~70F, where the FPL GTR-06 correction is zero) and sets is_fallback so
+ * (~70F, where the FPL GTR-6 correction is zero) and sets is_fallback so
  * the payload can flag the reading. The ESP32 die temperature is NOT used
  * for the correction: it reads tens of degrees above ambient and would
  * silently skew the corrected MC.

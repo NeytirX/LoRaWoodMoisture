@@ -1,5 +1,5 @@
 // include/wood_species_data.h
-// Stores species-specific coefficients for moisture content calculation based on FPL GTR-06.
+// Stores species-specific coefficients for moisture content calculation based on FPL GTR-6.
 // M = 10^(A + B * log10(R_kOhms))
 
 #ifndef WOOD_SPECIES_DATA_H
@@ -25,7 +25,7 @@ static const char SPECIES_NAME_5[] PROGMEM = "Generic Softwood (Avg)";
 static const char SPECIES_NAME_6[] PROGMEM = "Generic Hardwood (Avg)";
 
 // --- SPECIES DATA TABLE ---
-// Data sourced from FPL GTR-06, Table 1 (or similar references).
+// Data sourced from FPL GTR-6, Table 1 (or similar references).
 // R must be in kOhms when using these coefficients.
 // The constants below are illustrative examples - verify against the original document.
 const WoodSpecies species_data[] PROGMEM = {

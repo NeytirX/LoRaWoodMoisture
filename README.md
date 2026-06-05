@@ -2,15 +2,15 @@
 
 ## Project Overview
 
-This project implements a low-power, LoRaWAN-connected wood moisture monitoring system designed for long-term deployment in wood technology research and industrial applications. The system uses resistive probe technology based on the USDA Forest Products Laboratory (FPL) GTR-06 standard for accurate moisture content determination.
+This project implements a low-power, LoRaWAN-connected wood moisture monitoring system designed for long-term deployment in wood technology research and industrial applications. The system uses resistive probe technology based on the USDA Forest Products Laboratory (FPL) GTR-6 standard for accurate moisture content determination.
 
 This firmware is the consolidated version incorporating improvements from multiple development iterations, including LoRaWAN session persistence, DS18B20 temperature sensing, remote configuration via downlinks, and battery-aware power management.
 
 ### Key Features
 
-- **Resistive Moisture Measurement:** Two-electrode resistive probe method following FPL GTR-06 guidelines
+- **Resistive Moisture Measurement:** Two-electrode resistive probe method following FPL GTR-6 guidelines
 - **Species-Specific Calibration:** Supports multiple wood species with dedicated coefficients (A, B parameters)
-- **Temperature Compensation:** Implements FPL GTR-06 Table 2 correction factors via bilinear interpolation
+- **Temperature Compensation:** Implements FPL GTR-6 Table 2 correction factors via bilinear interpolation
 - **DS18B20 Temperature Sensor:** Optional 1-Wire temperature probe for direct wood temperature measurement; without a valid reading the MC correction uses a configured default temperature and the uplink is flagged
 - **LoRaWAN Connectivity:** EU433 band, OTAA, Cayenne LPP payload format for IoT integration
 - **Session Persistence:** LoRaWAN nonces saved to NVS and session saved to RTC memory across deep sleep cycles (avoids costly OTAA rejoin every wake)
@@ -168,7 +168,7 @@ const WoodSpecies species_data[] PROGMEM = {
 };
 ```
 
-Coefficients should be sourced from FPL GTR-06 Table 1 or peer-reviewed literature.
+Coefficients should be sourced from FPL GTR-6 Table 1 or peer-reviewed literature.
 
 ---
 
@@ -246,8 +246,8 @@ ESP32 Boot (reset / timer wake)
 | Configuration | `include/config.h` | System parameters and thresholds |
 | Sensor Layer | `include/sensor.h` | ADC, DS18B20, resistance measurement |
 | Session Manager | `include/session_manager.h` | LoRaWAN session save/restore (nonces in NVS, session in RTC memory) |
-| Species Data | `include/wood_species_data.h` | FPL GTR-06 species coefficients (PROGMEM) |
-| Temp Correction | `include/wood_temp_correction_data.h` | FPL GTR-06 Table 2 correction factors |
+| Species Data | `include/wood_species_data.h` | FPL GTR-6 species coefficients (PROGMEM) |
+| Temp Correction | `include/wood_temp_correction_data.h` | FPL GTR-6 Table 2 correction factors |
 | LoRaWAN Keys | `include/lorawan_keys.h` | Network credentials (MSB format: `uint64_t` EUIs, `uint8_t[16]` keys) |
 | Main Logic | `src/main.cpp` | Sequential boot-to-sleep flow, downlink handling |
 

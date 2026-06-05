@@ -233,13 +233,13 @@ Where:
 - `R_pullup` = 100 kOhm (precision resistor)
 - `ADC_max` = 4095 (12-bit resolution)
 
-**Moisture Content Calculation (FPL GTR-06):**
+**Moisture Content Calculation (FPL GTR-6):**
 
 ```
 M = 10^(A + B x log10(R_kOhm))
 ```
 
-Where A and B are species-specific coefficients from FPL GTR-06 Table 1.
+Where A and B are species-specific coefficients from FPL GTR-6 Table 1.
 
 ---
 
@@ -247,7 +247,7 @@ Where A and B are species-specific coefficients from FPL GTR-06 Table 1.
 
 **Files:**
 - `src/main.cpp` — `get_temperature_correction()`, `bilinear_interpolation()`
-- `include/wood_temp_correction_data.h` — FPL GTR-06 Table 2 data
+- `include/wood_temp_correction_data.h` — FPL GTR-6 Table 2 data
 
 **Algorithm:**
 
