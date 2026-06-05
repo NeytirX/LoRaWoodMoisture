@@ -2,9 +2,10 @@
 
 ## Overview
 
-This document describes the calibration procedure for resistive wood moisture probes used in the LoRaWAN Wood Moisture Monitoring System. The procedure follows guidelines from USDA Forest Products Laboratory (FPL) GTR-06 and adapts them for the embedded system implementation.
+This document describes the calibration procedure for resistive wood moisture probes used in the LoRaWAN Wood Moisture Monitoring System. The procedure follows guidelines from USDA Forest Products Laboratory (FPL) GTR-6 and adapts them for the embedded system implementation.
 
-**Standard Reference:** FPL GTR-06 "Wood Handbook: Wood as an Engineering Material"
+**Standard Reference:** James, W.L. (1988). *Electric Moisture Meters for Wood* (FPL-GTR-6)
+**Secondary Reference:** USDA FPL (2021). *Wood Handbook: Wood as an Engineering Material* (FPL-GTR-190), moisture relations chapters
 **Application:** Master Thesis in Wood Technologies - Field Deployment Validation
 
 ---
@@ -16,7 +17,7 @@ This document describes the calibration procedure for resistive wood moisture pr
 Below the fiber saturation point (FSP, approximately 25-30% MC), wood electrical resistance decreases exponentially with increasing moisture content:
 
 ```
-R = 10^((M - A) / B)
+R_kOhms = 10^((log10(M) - A) / B)
 ```
 
 Or, solving for moisture content (M):
@@ -38,7 +39,7 @@ Coefficients A and B vary by wood species due to differences in:
 - Cellular structure
 - Grain orientation
 
-**Example Coefficients (FPL GTR-06 Table 1):**
+**Example Coefficients (FPL GTR-6 Table 1):**
 
 | Species | A | B | Valid Range (% MC) |
 |---------|---|---|-------------------|
@@ -46,6 +47,8 @@ Coefficients A and B vary by wood species due to differences in:
 | Southern Yellow Pine | 1.806 | -0.02994 | 6-25 |
 | Sitka Spruce | 1.621 | -0.02641 | 6-25 |
 | Red Oak | 1.912 | -0.03218 | 6-25 |
+
+> **Caution:** the coefficients above are illustrative placeholders (see `docs/ai/issues.md` #11); they do not reproduce real resistance-MC behavior. Thesis coefficients come from the M3 regression (§6.2), backed by James (1988) and additional literature.
 
 All species coefficients are stored in `include/wood_species_data.h`. The active species is selected at compile time via `SELECTED_WOOD_SPECIES_INDEX` in `include/config.h`, or at runtime via a LoRaWAN downlink command (`DOWNLINK_CMD_SET_SPECIES`, 0x02).
 
@@ -92,20 +95,22 @@ The firmware uses `ADC_11db` attenuation for full 0-3.3V range. Each measurement
                            ADC GPIO35
    ```
 
-2. **Test resistor values:**
-   - 100 kOhm (expected ADC: ~2048)
-   - 1 MOhm (expected ADC: ~372)
-   - 10 MOhm (expected ADC: ~40)
-   - 100 Ohm (expected ADC: ~4090, near saturation)
+2. **Test resistor values** (expected counts follow the firmware circuit: `R_wood = R_PULLUP_OHMS * ADC / (ADC_MAX_READING - ADC)`, probe side to GND):
+   - 100 Ohm (expected ADC: ~4, short-circuit region)
+   - 100 kOhm (expected ADC: ~2048, mid-scale)
+   - 1 MOhm (expected ADC: ~3723, beyond the linearity knee)
+   - 10 MOhm (expected ADC: ~4054, near saturation)
+
+   > **Caveat:** on the internal ESP32 ADC, counts above ~3043 (node above ~2.45 V, i.e. R_test above ~290 kOhm with the stock 100 kOhm pull-up) sit in the nonlinear region - expect the 1 MOhm and 10 MOhm points to read compressed or clipped. Those two points verify where saturation begins, not accuracy. For full-range verification, run the extended precision-resistor ladder in `docs/ai/2026-06-05-001-feat-measurement-front-end-plan.md` (Acceptance Test) before conditioning any wood samples.
 
 3. **Record readings:**
    ```
    R_test (Ohm)  | ADC Expected | ADC Measured | Error (%)
    --------------|--------------|--------------|----------
-   100           | 4091         | _____        | _____
+   100           | 4            | _____        | _____
    100000        | 2048         | _____        | _____
-   1000000       | 372          | _____        | _____
-   10000000      | 40           | _____        | _____
+   1000000       | 3723         | _____        | _____
+   10000000      | 4054         | _____        | _____
    ```
 
 4. **Adjust if needed:**
@@ -136,7 +141,7 @@ The firmware uses `ADC_11db` attenuation for full 0-3.3V range. Each measurement
 
 4. **Calculate probe correction factor:**
    ```
-   R_expected = 10^((M_ref - A) / B) * 1000  // in ohms
+   R_expected = 10^((log10(M_ref) - A) / B) * 1000  // in ohms
    Probe_Factor = R_measured / R_expected
    ```
 
@@ -211,7 +216,7 @@ The firmware uses `ADC_11db` attenuation for full 0-3.3V range. Each measurement
 
 ### 5.1 Temperature Coefficient Verification
 
-**Purpose:** Validate FPL GTR-06 Table 2 correction factors.
+**Purpose:** Validate FPL GTR-6 Table 2 correction factors.
 
 The firmware uses bilinear interpolation of a 13x20 correction lookup table (stored in `include/wood_temp_correction_data.h`) to apply temperature correction to indicated MC. Reference temperature is 70 F (21 C) where correction is zero.
 
@@ -411,7 +416,7 @@ Implement in data analysis:
 def quality_flag(mc, resistance, battery):
     if battery < 3.2: return "BAD"       # Low battery
     if resistance < 100: return "SUSPECT" # Possible short
-    if resistance > 50e6: return "BAD"    # Open circuit
+    if resistance > 200e6: return "BAD"   # Open circuit (MAX_VALID_RESISTANCE_OHMS)
     if mc < 6 or mc > 30: return "SUSPECT"# Out of calibration range
     return "GOOD"
 ```
@@ -420,11 +425,13 @@ def quality_flag(mc, resistance, battery):
 
 ## 10. References
 
-1. USDA Forest Products Laboratory. (2021). *Wood Handbook: Wood as an Engineering Material* (GTR-06). Madison, WI.
+1. James, W.L. (1988). *Electric Moisture Meters for Wood* (Gen. Tech. Rep. FPL-GTR-6). Madison, WI: USDA Forest Service, Forest Products Laboratory. (Source of the resistance-MC relation and temperature corrections; previously misattributed here to the Wood Handbook.)
 
-2. Simpson, W.T. (1993). *Determine Moisture Content and Affect on Strength*. USDA Forest Service.
+2. USDA Forest Products Laboratory. (2021). *Wood Handbook: Wood as an Engineering Material* (FPL-GTR-190). Madison, WI.
 
-3. Norimoto, M. (1976). *Dielectric properties of wood*. Wood Research, 59, 1-108.
+3. Simpson, W.T. (1993). *Determine Moisture Content and Affect on Strength*. USDA Forest Service.
+
+4. Norimoto, M. (1976). *Dielectric properties of wood*. Wood Research, 59, 1-108.
 
 ---
 
@@ -435,7 +442,7 @@ def quality_flag(mc, resistance, battery):
 R_wood = R_pullup * (ADC / (4095 - ADC))
 ```
 
-### Moisture Content (FPL GTR-06)
+### Moisture Content (FPL GTR-6)
 ```
 MC = 10^(A + B * log10(R_kOhms))
 ```
@@ -452,6 +459,6 @@ MC = (W_wet - W_dry) / W_dry * 100%
 
 ---
 
-**Document Version:** 1.1
-**Last Updated:** 2026-03-17
+**Document Version:** 1.2
+**Last Updated:** 2026-06-05
 **Author:** Master Thesis Project, Wood Technologies
