@@ -330,12 +330,11 @@ Edit `include/config.h`:
 ```cpp
 // Available species (from wood_species_data.h):
 // 0: Douglas-Fir (Coast)
-// 1: Pine, Southern Yellow (Loblolly)
-// 2: Spruce, Sitka
-// 3: Oak, Red
-// 4: Maple, Sugar
-// 5: Generic Softwood (Avg)
-// 6: Generic Hardwood (Avg)
+// 1: Oak, White
+// 2: Oak, Northern Red
+// 3: Ash, Black
+// 4: Walnut, Black
+// 5: Beech (placeholder - not in FPL-GTR-6 Table 1)
 
 #define SELECTED_WOOD_SPECIES_INDEX 0  // Change as needed
 ```
