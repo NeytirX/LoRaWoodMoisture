@@ -247,7 +247,7 @@ Where A and B are species-specific coefficients from FPL GTR-6 Table 1.
 
 **Files:**
 - `src/main.cpp` — `get_temperature_correction()`, `bilinear_interpolation()`
-- `include/wood_temp_correction_data.h` — FPL GTR-6 Table 2 data
+- `include/wood_temp_correction_data.h` — FPL-GTR-6 Figure 5 correction grid (Celsius, digitized 2026-06-05)
 
 **Algorithm:**
 
@@ -320,9 +320,9 @@ Large constant data structures are stored in flash (PROGMEM) to conserve RAM:
 |----------------|------|----------|
 | `species_data[]` | ~140 bytes | Flash |
 | Species name strings | ~200 bytes | Flash (separate PROGMEM arrays) |
-| `temp_points_f[]` | 52 bytes | Flash |
+| `temp_points_c[]` | 60 bytes | Flash |
 | `mc_points_indicated[]` | 80 bytes | Flash |
-| `correction_table[][]` | 1040 bytes | Flash |
+| `correction_table[][]` | 1200 bytes | Flash |
 | LoRaWAN keys | ~50 bytes | Flash |
 
 ### 3.3 RTC_DATA_ATTR Usage

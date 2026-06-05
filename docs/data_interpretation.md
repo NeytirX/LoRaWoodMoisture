@@ -86,27 +86,28 @@ Wood electrical resistance varies with temperature:
 - Winter readings appear artificially high
 - Seasonal trends are distorted
 
-### 2.2 Correction Factor Table (FPL GTR-6)
+### 2.2 Correction Factor Table (FPL-GTR-6, Figure 5)
 
-> **WARNING (under review):** the sign convention below is suspected inverted relative to physics - cold wood reads *low* and should get a *positive* correction, warm wood the opposite. Pending re-transcription from the original FPL-GTR-6 chart; see the warning in `include/wood_temp_correction_data.h`. Do not use these values for thesis data until resolved.
-
-Correction values (C_t) to **add** to indicated MC:
+Correction values (C_t) to **add** to indicated MC. Digitized 2026-06-05 from
+James (1988) Figure 5 (resistance-type meters, calibration 70 F / 21.1 C); the
+full Celsius grid lives in `include/wood_temp_correction_data.h`. Excerpt:
 
 ```
-Temperature ->    0F     20F    40F    60F    70F    80F    100F   120F
-MC              (-18C) (-7C)  (4C)  (16C) (21C) (27C) (38C) (49C)
+Temperature ->  -20C   -10C    0C    10C    20C    30C    40C    50C
+MC indicated
 ----------------------------------------------------------------------
-6%            -1.8   -1.2   -0.7   -0.2    0.0    0.2    0.5    0.7
-10%           -2.9   -2.0   -1.1   -0.4    0.0    0.4    0.9    1.4
-15%           -4.2   -3.0   -1.8   -0.6    0.0    0.6    1.4    2.1
-20%           -5.5   -4.0   -2.5   -0.9    0.0    0.9    1.9    2.9
-25%           -6.9   -5.0   -3.1   -1.1    0.0    1.0    2.3    3.5
+6%              4.7    3.2    1.9    0.9    0.1   -0.7   -1.4   -2.1
+10%             6.8    4.4    2.7    1.3    0.1   -0.9   -1.8   -2.7
+15%             8.6    6.2    3.9    1.8    0.2   -1.2   -2.5   -3.6
+20%            12.7    7.8    4.8    2.2    0.2   -1.6   -3.1   -4.4
+25%            17.7   10.1    6.0    2.8    0.2   -1.9   -3.8   -5.4
 ```
 
 **Key Points:**
-- Reference temperature: 70 F (21 C) - no correction
-- Below 70 F: Negative correction (subtract)
-- Above 70 F: Positive correction (add)
+- Reference temperature: 70 F (21.1 C) - no correction
+- Below ~21 C: Positive correction (cold wood has higher resistance, the meter reads low - add)
+- Above ~21 C: Negative correction (warm wood has lower resistance, the meter reads high - subtract)
+- Cells implying true MC above 28% (very cold + very wet) extrapolate beyond the chart's curve family and carry extra uncertainty
 
 ### 2.3 Correction Example
 
@@ -117,14 +118,14 @@ Wood_temp = 10 C (50 F)
 ```
 
 **Lookup C_t:**
-- At 50 F and 14.5% MC: C_t ~ -1.2% (interpolated)
+- At 10 C and 14.5% MC: C_t ~ +1.7% (interpolated)
 
 **Corrected MC:**
 ```
-MC_corrected = 14.5% + (-1.2%) = 13.3%
+MC_corrected = 14.5% + 1.7% = 16.2%
 ```
 
-**Interpretation:** The wood appears wetter than it actually is because cold wood has higher resistance. After correction, the true MC is 13.3%.
+**Interpretation:** Cold wood has higher resistance, so the meter under-reads; the wood is actually wetter than indicated. After correction, the true MC is 16.2%.
 
 ### 2.4 Visualizing Correction Impact
 

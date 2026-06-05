@@ -527,23 +527,22 @@ float calculate_indicated_mc(float R_wood_ohms, const WoodSpecies& species) {
 }
 
 // =============================================================================
-// TEMPERATURE CORRECTION (FPL GTR-6 Table 2)
+// TEMPERATURE CORRECTION (FPL-GTR-6 Figure 5, Celsius grid)
 // =============================================================================
 float get_temperature_correction(float indicated_mc, float wood_temp_celsius) {
     if (!ENABLE_TEMPERATURE_COMPENSATION) return 0.0f;
 
-    float wood_temp_f = (wood_temp_celsius * 9.0f / 5.0f) + 32.0f;
-
-    float first_temp = pgm_read_float(&temp_points_f[0]);
-    float last_temp  = pgm_read_float(&temp_points_f[TEMP_POINTS_COUNT - 1]);
+    // The correction grid is in Celsius (matches the DS18B20), no conversion.
+    float first_temp = pgm_read_float(&temp_points_c[0]);
+    float last_temp  = pgm_read_float(&temp_points_c[TEMP_POINTS_COUNT - 1]);
     float first_mc   = pgm_read_float(&mc_points_indicated[0]);
     float last_mc    = pgm_read_float(&mc_points_indicated[MC_POINTS_COUNT - 1]);
 
-    wood_temp_f  = constrain(wood_temp_f, first_temp, last_temp);
-    indicated_mc = constrain(indicated_mc, first_mc, last_mc);
+    float wood_temp = constrain(wood_temp_celsius, first_temp, last_temp);
+    indicated_mc    = constrain(indicated_mc, first_mc, last_mc);
 
-    return bilinear_interpolation(wood_temp_f, indicated_mc,
-                                  temp_points_f, TEMP_POINTS_COUNT,
+    return bilinear_interpolation(wood_temp, indicated_mc,
+                                  temp_points_c, TEMP_POINTS_COUNT,
                                   mc_points_indicated, MC_POINTS_COUNT,
                                   correction_table);
 }

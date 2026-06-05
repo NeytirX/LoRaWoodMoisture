@@ -101,28 +101,37 @@ static void test_bilinear_degenerate_cell_returns_corner(void) {
 // get_temperature_correction - real table, sign-agnostic invariants only
 // ---------------------------------------------------------------------------
 
-static void test_correction_zero_at_reference_70f(void) {
+static void test_correction_near_zero_at_reference_21c(void) {
     // 70 F = 21.1 C is the meter calibration reference; the correction must
-    // vanish there for any indicated MC, whatever the table's sign convention.
+    // be ~zero there for any indicated MC (interpolated between the 20 C and
+    // 25 C rows, so not exactly zero).
     const float t_ref_c = (70.0f - 32.0f) * 5.0f / 9.0f;
     for (float mc = 6.0f; mc <= 25.0f; mc += 1.0f)
-        TEST_ASSERT_FLOAT_WITHIN(0.05f, 0.0f,
+        TEST_ASSERT_FLOAT_WITHIN(0.25f, 0.0f,
                                  wood_mc::get_temperature_correction(mc, t_ref_c));
 }
 
 static void test_correction_clamps_below_table_min_temp(void) {
-    // below the first table row the correction is held constant, not extrapolated
-    const float t_min_c = (0.0f - 32.0f) * 5.0f / 9.0f;
+    // below the first table row (-20 C) the correction is held constant
     TEST_ASSERT_FLOAT_WITHIN(1e-3f,
-        wood_mc::get_temperature_correction(15.0f, t_min_c),
+        wood_mc::get_temperature_correction(15.0f, -20.0f),
         wood_mc::get_temperature_correction(15.0f, -40.0f));
 }
 
 static void test_correction_clamps_above_table_max_temp(void) {
-    const float t_max_c = (120.0f - 32.0f) * 5.0f / 9.0f;
+    // above the last table row (50 C) the correction is held constant
     TEST_ASSERT_FLOAT_WITHIN(1e-3f,
-        wood_mc::get_temperature_correction(15.0f, t_max_c),
+        wood_mc::get_temperature_correction(15.0f, 50.0f),
         wood_mc::get_temperature_correction(15.0f, 80.0f));
+}
+
+static void test_correction_golden_cells(void) {
+    // Golden values against the current digitized table (FPL-GTR-6 Figure 5,
+    // 2026-06-05). At exact grid nodes bilinear interpolation returns the
+    // cell itself; update these only when the table is re-derived.
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f,  6.2f, wood_mc::get_temperature_correction(15.0f, -10.0f));
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, -4.4f, wood_mc::get_temperature_correction(20.0f,  50.0f));
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f,  1.9f, wood_mc::get_temperature_correction( 6.0f,   0.0f));
 }
 
 static void test_correction_clamps_mc_outside_columns(void) {
@@ -135,9 +144,9 @@ static void test_correction_clamps_mc_outside_columns(void) {
 }
 
 static void test_correction_direction_matches_physics(void) {
-    // issues.md #9: the shipped table's signs are suspected inverted.
-    // Enable in the same commit as the FPL-GTR-6 re-transcription.
-    TEST_IGNORE_MESSAGE("blocked on issues.md #9 - enable after FPL-GTR-6 re-transcription");
+    // Enabled 2026-06-05 with the table re-digitized from FPL-GTR-6 Figure 5
+    // (closes issues.md #9): wood resistance falls as temperature rises, so a
+    // meter calibrated at 21 C reads low on cold wood and high on warm wood.
     TEST_ASSERT_TRUE(wood_mc::get_temperature_correction(15.0f, 0.0f) > 0.0f);  // cold reads low -> add
     TEST_ASSERT_TRUE(wood_mc::get_temperature_correction(15.0f, 45.0f) < 0.0f); // warm reads high -> subtract
 }
@@ -153,10 +162,11 @@ int main(int, char**) {
     RUN_TEST(test_bilinear_reproduces_plane_at_nodes);
     RUN_TEST(test_bilinear_is_exact_on_plane_interior);
     RUN_TEST(test_bilinear_degenerate_cell_returns_corner);
-    RUN_TEST(test_correction_zero_at_reference_70f);
+    RUN_TEST(test_correction_near_zero_at_reference_21c);
     RUN_TEST(test_correction_clamps_below_table_min_temp);
     RUN_TEST(test_correction_clamps_above_table_max_temp);
     RUN_TEST(test_correction_clamps_mc_outside_columns);
+    RUN_TEST(test_correction_golden_cells);
     RUN_TEST(test_correction_direction_matches_physics);
     return UNITY_END();
 }

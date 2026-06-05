@@ -216,9 +216,9 @@ The firmware uses `ADC_11db` attenuation for full 0-3.3V range. Each measurement
 
 ### 5.1 Temperature Coefficient Verification
 
-**Purpose:** Validate FPL GTR-6 Table 2 correction factors.
+**Purpose:** Validate the FPL-GTR-6 Figure 5 correction factors (digitized 2026-06-05).
 
-The firmware uses bilinear interpolation of a 13x20 correction lookup table (stored in `include/wood_temp_correction_data.h`) to apply temperature correction to indicated MC. Reference temperature is 70 F (21 C) where correction is zero.
+The firmware uses bilinear interpolation of a temperature x indicated-MC correction grid in Celsius (stored in `include/wood_temp_correction_data.h`) to apply temperature correction to indicated MC. Reference temperature is 70 F (21.1 C) where the correction is ~zero; cold wood reads low (positive correction), warm wood reads high (negative correction).
 
 **Procedure:**
 
