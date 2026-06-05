@@ -440,10 +440,11 @@ Wake reason: Timer
 Woke from deep sleep.
 Selected species [0]: Douglas-Fir (Coast)
 [Phase] PMIC Setup
-PMIC initialized OK.
+Init PMIC (AXP192/AXP2101)...
+PMIC: AXP2101 (T-Beam v1.2) initialized OK.
 [Battery] Voltage: 3.89 V
 [Phase] Sensor Init
-[Sensor] ADC attenuation set. Pin: 32
+[Sensor] ADC attenuation set. Pin: 35
 [Sensor] DS18B20 found! Devices: 1, Resolution: 12 bits
 [Phase] Radio Init
 [Radio] SX1262 initialized OK
