@@ -10,7 +10,7 @@ This firmware is the consolidated version incorporating improvements from multip
 
 - **Resistive Moisture Measurement:** Two-electrode resistive probe method following FPL GTR-6 guidelines
 - **Species-Specific Calibration:** Supports multiple wood species with dedicated coefficients (A, B parameters)
-- **Temperature Compensation:** Implements FPL GTR-6 Table 2 correction factors via bilinear interpolation
+- **Temperature Compensation:** Implements the FPL-GTR-6 Figure 5 correction grid (Celsius, digitized from the original chart) via bilinear interpolation
 - **DS18B20 Temperature Sensor:** Optional 1-Wire temperature probe for direct wood temperature measurement; without a valid reading the MC correction uses a configured default temperature and the uplink is flagged
 - **LoRaWAN Connectivity:** EU433 band, OTAA, Cayenne LPP payload format for IoT integration
 - **Session Persistence:** LoRaWAN nonces saved to NVS and session saved to RTC memory across deep sleep cycles (avoids costly OTAA rejoin every wake)
@@ -247,7 +247,7 @@ ESP32 Boot (reset / timer wake)
 | Sensor Layer | `include/sensor.h` | ADC, DS18B20, resistance measurement |
 | Session Manager | `include/session_manager.h` | LoRaWAN session save/restore (nonces in NVS, session in RTC memory) |
 | Species Data | `include/wood_species_data.h` | FPL GTR-6 species coefficients (PROGMEM) |
-| Temp Correction | `include/wood_temp_correction_data.h` | FPL GTR-6 Table 2 correction factors |
+| Temp Correction | `include/wood_temp_correction_data.h` | FPL-GTR-6 Figure 5 correction grid (Celsius) |
 | LoRaWAN Keys | `include/lorawan_keys.h` | Network credentials (MSB format: `uint64_t` EUIs, `uint8_t[16]` keys) |
 | Main Logic | `src/main.cpp` | Sequential boot-to-sleep flow, downlink handling |
 

@@ -252,11 +252,10 @@ Where A and B are species-specific coefficients from FPL GTR-6 Table 1.
 **Algorithm:**
 
 1. Read wood temperature (DS18B20 primary, `DEFAULT_WOOD_TEMP_CELSIUS` fallback)
-2. Convert to Fahrenheit: `T_F = T_C x 9/5 + 32`
-3. Constrain temperature to table range (0F - 120F)
-4. Constrain indicated MC to table range (6% - 25%)
-5. Perform bilinear interpolation on correction table
-6. Apply: `MC_corrected = MC_indicated + C_t`
+2. Constrain temperature to the table range (-20 C to 50 C; the grid is in Celsius, no unit conversion)
+3. Constrain indicated MC to the table range (6% - 25%)
+4. Perform bilinear interpolation on the correction grid
+5. Apply: `MC_corrected = MC_indicated + C_t`
 
 ---
 
