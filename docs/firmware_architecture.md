@@ -51,13 +51,15 @@ RadioLib uses a synchronous/blocking API. The entire cycle runs in `setup()`, th
 | Phase | Description | On Failure |
 |-------|-------------|------------|
 | 1. PMIC Setup | PMIC detect (AXP192/AXP2101), enable LoRa power, disable GPS | Continue without PMIC |
+| 1b. Critical Battery Check | Read voltage, abort before radio if critical | Extended sleep |
 | 2. Sensor Init | ADC attenuation, DS18B20 detection | Continue (default-temp fallback, flagged in payload) |
 | 3. Radio Init + Join/Restore | SX1262 init, restore session, OTAA activate | Sleep and retry |
-| 4. Battery Check | Read voltage, abort if critical | Extended sleep |
 | 5. Sensor Measurement | Resistance, temperature, MC calculation | Continue with available data |
 | 6. Build Payload | Cayenne LPP encoding | Skip TX if empty |
 | 7. LoRaWAN Uplink | sendReceive() with downlink check | Save session, sleep |
 | 8. Deep Sleep | Timer wakeup configured | N/A |
+
+The critical-battery read runs right after PMIC init (before the expensive radio init / OTAA join) so a critically low battery skips the radio entirely. The payload-facing battery voltage is re-read during Phase 5.
 
 ### 1.3 Execution Flow Diagram
 
@@ -72,6 +74,11 @@ RadioLib uses a synchronous/blocking API. The entire cycle runs in `setup()`, th
               (PMIC init, power rails)
                         |
                         v
+            Phase 1b: Critical Battery Check
+                      |
+            [critical voltage?]----> Extended sleep
+                      |
+                      v
                Phase 2: Sensor Init
               (ADC config, DS18B20 detect)
                         |
@@ -88,11 +95,6 @@ RadioLib uses a synchronous/blocking API. The entire cycle runs in `setup()`, th
              +--------+-----------+
                       |
             [activation failed?]----> Sleep + retry
-                      |
-                      v
-              Phase 4: Battery Check
-                      |
-            [critical voltage?]----> Extended sleep
                       |
                       v
               Phase 5: Measurement
@@ -436,6 +438,7 @@ Woke from deep sleep.
 Selected species [0]: Douglas-Fir (Coast)
 [Phase] PMIC Setup
 PMIC initialized OK.
+[Battery] Voltage: 3.89 V
 [Phase] Sensor Init
 [Sensor] ADC attenuation set. Pin: 32
 [Sensor] DS18B20 found! Devices: 1, Resolution: 12 bits
@@ -445,7 +448,6 @@ PMIC initialized OK.
 [Session] Session restored from RTC (228 bytes)
 [LoRaWAN] Activating OTAA...
 [LoRaWAN] Session restored from saved state!
-[Battery] Voltage: 3.89 V
 [Phase] Sensor Measurement
 [Sensor] Avg Raw ADC: 1234.56
 Wood Resistance: 45.67 kOhms

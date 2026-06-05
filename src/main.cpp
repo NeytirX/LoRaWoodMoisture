@@ -148,6 +148,25 @@ void setup() {
     #endif
 
     // =====================================================================
+    // PHASE 1b: Critical Battery Check
+    // =====================================================================
+    // Read battery voltage immediately after PMIC init and abort before the
+    // expensive radio init / OTAA join: on a critically low battery there is no
+    // point spending the most power-hungry operation just to skip the cycle.
+    #ifdef USE_AXP_POWER_MANAGEMENT
+    if (pmic_initialized) {
+        last_battery_v = pmic_batt_voltage();
+        DEBUG_PRINT(F("[Battery] Voltage: ")); DEBUG_PRINT(last_battery_v); DEBUG_PRINTLN(F(" V"));
+        if (last_battery_v < CRITICAL_BATTERY_THRESHOLD_V) {
+            DEBUG_PRINTLN(F("[Battery] CRITICAL! Skipping measurement. Extended sleep."));
+            uint32_t sleep_s = current_interval_seconds * CRITICAL_BATTERY_SLEEP_MULTIPLIER;
+            deep_sleep_with_timer(sleep_s);
+            return;
+        }
+    }
+    #endif
+
+    // =====================================================================
     // PHASE 2: Sensor Init
     // =====================================================================
     DEBUG_PRINTLN(F("[Phase] Sensor Init"));
@@ -232,22 +251,6 @@ void setup() {
         }
         return;
     }
-
-    // =====================================================================
-    // PHASE 4: Battery Check
-    // =====================================================================
-    #ifdef USE_AXP_POWER_MANAGEMENT
-    if (pmic_initialized) {
-        last_battery_v = pmic_batt_voltage();
-        DEBUG_PRINT(F("[Battery] Voltage: ")); DEBUG_PRINT(last_battery_v); DEBUG_PRINTLN(F(" V"));
-        if (last_battery_v < CRITICAL_BATTERY_THRESHOLD_V) {
-            DEBUG_PRINTLN(F("[Battery] CRITICAL! Skipping measurement. Extended sleep."));
-            uint32_t sleep_s = current_interval_seconds * CRITICAL_BATTERY_SLEEP_MULTIPLIER;
-            deep_sleep_with_timer(sleep_s);
-            return;
-        }
-    }
-    #endif
 
     // =====================================================================
     // PHASE 5: Sensor Measurement
