@@ -50,13 +50,25 @@ static void test_mc_monotonically_decreasing_in_resistance(void) {
 }
 
 static void test_mc_real_species_golden(void) {
-    // Golden values against the FPL-GTR-6 Table 1 fits (wood_species_data.h,
-    // 2026-06-05). Index 0 = Douglas-Fir (Coast), A=1.7003 B=-0.12007.
+    // Golden values pin the shipped coefficients (wood_species_data.h).
+    // Index 0 = Douglas-Fir (Coast), FPL-GTR-6 fit, A=1.7003 B=-0.12007.
     // Round-trips the table: 1 MOhm -> ~22 %, 10 MOhm -> ~16.6 % MC.
     WoodSpecies douglas;
     memcpy_P(&douglas, &species_data[0], sizeof(WoodSpecies));
     TEST_ASSERT_FLOAT_WITHIN(0.05f, 21.88f, wood_mc::calculate_indicated_mc(1.0e6f, douglas));
     TEST_ASSERT_FLOAT_WITHIN(0.05f, 16.60f, wood_mc::calculate_indicated_mc(1.0e7f, douglas));
+
+    // Index 1 = Oak (European), VTT 2000 Table 5 CE curve re-fit, A=1.6852 B=-0.11368.
+    WoodSpecies oak_eu;
+    memcpy_P(&oak_eu, &species_data[1], sizeof(WoodSpecies));
+    TEST_ASSERT_FLOAT_WITHIN(0.05f, 22.08f, wood_mc::calculate_indicated_mc(1.0e6f, oak_eu));
+    TEST_ASSERT_FLOAT_WITHIN(0.05f, 17.00f, wood_mc::calculate_indicated_mc(1.0e7f, oak_eu));
+
+    // Index 4 = Beech (European), VTT 2000 Table 5 CE curve re-fit, A=1.6688 B=-0.10258.
+    WoodSpecies beech_eu;
+    memcpy_P(&beech_eu, &species_data[4], sizeof(WoodSpecies));
+    TEST_ASSERT_FLOAT_WITHIN(0.05f, 22.97f, wood_mc::calculate_indicated_mc(1.0e6f, beech_eu));
+    TEST_ASSERT_FLOAT_WITHIN(0.05f, 18.13f, wood_mc::calculate_indicated_mc(1.0e7f, beech_eu));
     // Every shipped species must have a physically sane slope (B in -0.13..-0.10).
     for (int i = 0; i < NUM_WOOD_SPECIES; i++) {
         WoodSpecies s;
