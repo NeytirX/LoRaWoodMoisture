@@ -130,39 +130,91 @@ inline float read_wood_temperature(bool &is_fallback) {
 /**
  * Read the wood resistance in Ohms using the voltage divider circuit.
  *
- * Circuit: VCC -> R_pullup -> ADC_PIN -> R_wood -> GND
- * R_wood = R_pullup * (ADC / (ADC_MAX - ADC))
+ * Circuit: V_top (probe power pin, ~VCC_PROBE_VOLTAGE) -> R_pullup -> ADC_PIN
+ *          -> R_wood -> GND
+ *   V_node = V_top * R_wood / (R_wood + R_pullup)
+ *   R_wood = R_pullup * V_node / (V_top - V_node)
+ *
+ * Two deliberate choices here (see docs/data_interpretation.md):
+ *   - The divider math runs on analogReadMilliVolts(), which applies the ESP32
+ *     eFuse ADC calibration (linearity + offset). The old raw-count form assumed
+ *     ADC full-scale == V_top, which is not true on the ESP32 at 11 dB.
+ *   - The open-circuit (very-dry) gate stays on the RAW count, because the raw
+ *     ADC saturates cleanly at full scale whereas the calibrated mV compresses
+ *     near the top rail and cannot reliably reach V_top.
+ *
+ * V_top defaults to VCC_PROBE_VOLTAGE (3.3 V nominal). For best accuracy, measure
+ * the probe power pin's HIGH voltage under load once and set VCC_PROBE_VOLTAGE.
+ *
+ * Sets adc_nonlinear = true when the divider node sits past the ESP32 ADC's
+ * linearity knee (or saturates), i.e. the returned R is in the "silent
+ * compression zone" and the MC is low-confidence. This is flagged on the ADC
+ * voltage, NOT the computed resistance: in that zone the R value is itself
+ * corrupted, so a value-based bound would miss it (see the front-end plan in
+ * docs/ai/2026-06-05-001-feat-measurement-front-end-plan.md).
  *
  * NOTE: The probe power pin must already be HIGH before calling this function.
  */
-inline float read_wood_resistance_ohms() {
-    // Wait for voltage to stabilize after power-up
+inline float read_wood_resistance_ohms(bool &adc_nonlinear) {
+    adc_nonlinear = false;
+
+    // Wait for the divider node to settle after the probe power pin goes HIGH.
     delay(ADC_READ_STABILIZATION_MS);
 
-    // Multi-sample averaging to reduce noise
-    uint32_t adc_sum = 0;
-    for (int i = 0; i < ADC_SAMPLES_TO_AVERAGE; i++) {
-        adc_sum += analogRead(MOISTURE_PROBE_ADC_PIN);
-        delay(5);
-    }
-    float adc_raw_avg = (float)adc_sum / ADC_SAMPLES_TO_AVERAGE;
-
-    Serial.print(F("[Sensor] Avg Raw ADC: "));
-    Serial.println(adc_raw_avg);
-
-    // Edge cases
-    if (adc_raw_avg >= (ADC_MAX_READING - 1.0f)) {
-        Serial.println(F("[Sensor] ADC saturated high — open circuit / very dry wood"));
+    // Open-circuit / very-dry gate on the raw count (calibration-independent).
+    int raw_gate = analogRead(MOISTURE_PROBE_ADC_PIN);
+    if (raw_gate >= (int)(ADC_MAX_READING - 2.0f)) {
+        adc_nonlinear = true;
+        Serial.println(F("[Sensor] ADC saturated high — open circuit / very dry wood (out of range)"));
         return 1.0e12f; // Effectively infinite resistance
     }
-    if (adc_raw_avg < 1.0f) {
-        Serial.println(F("[Sensor] ADC near zero — short circuit / extremely wet"));
-        return 1.0e-3f; // Near-zero resistance
+
+    // Calibrated-millivolt sampling.
+    uint32_t samples[ADC_SAMPLES_TO_AVERAGE];
+    for (int i = 0; i < ADC_SAMPLES_TO_AVERAGE; i++) {
+        samples[i] = analogReadMilliVolts(MOISTURE_PROBE_ADC_PIN);
+        delay(5);
     }
 
-    // Voltage divider: R_wood = R_pullup * (V_adc / (VCC - V_adc))
-    // Since V_adc is proportional to ADC: R_wood = R_pullup * (ADC / (ADC_MAX - ADC))
-    float R_wood = R_PULLUP_OHMS * (adc_raw_avg / (ADC_MAX_READING - adc_raw_avg));
+    // Trimmed mean: drop the lowest and highest sample, average the rest. Keeps
+    // the noise reduction of oversampling while rejecting a single EMI/RFI spike
+    // (a documented artifact for this resistive probe).
+    uint32_t v_min = samples[0], v_max = samples[0], v_sum = 0;
+    for (int i = 0; i < ADC_SAMPLES_TO_AVERAGE; i++) {
+        v_sum += samples[i];
+        if (samples[i] < v_min) v_min = samples[i];
+        if (samples[i] > v_max) v_max = samples[i];
+    }
+    float v_node_mv = (ADC_SAMPLES_TO_AVERAGE > 2)
+        ? (float)(v_sum - v_min - v_max) / (ADC_SAMPLES_TO_AVERAGE - 2)
+        : (float)v_sum / ADC_SAMPLES_TO_AVERAGE;
+
+    Serial.print(F("[Sensor] Node voltage (trimmed mean): "));
+    Serial.print(v_node_mv);
+    Serial.println(F(" mV"));
+
+    const float v_top_mv = VCC_PROBE_VOLTAGE * 1000.0f;
+
+    // Short circuit / extremely wet: node pulled near 0 V.
+    if (v_node_mv < ADC_SHORT_CIRCUIT_MV) {
+        Serial.println(F("[Sensor] Node near 0 V — short circuit / extremely wet"));
+        return 1.0e-3f; // Near-zero resistance
+    }
+    // Safety guard for the divider denominator (calibrated mV should stay below
+    // V_top, but a noisy over-range sample must not produce a negative R).
+    if (v_node_mv >= (v_top_mv - 1.0f)) {
+        adc_nonlinear = true;
+        Serial.println(F("[Sensor] Node at V_top — treating as open circuit"));
+        return 1.0e12f;
+    }
+    // Past the ADC linearity knee the conversion is compressed and the returned
+    // R is systematically wrong (silent zone). Report it but flag low-confidence.
+    if (v_node_mv > ADC_LINEARITY_LIMIT_MV) {
+        adc_nonlinear = true;
+        Serial.println(F("[Sensor] Node past ADC linearity knee — reading low-confidence (flagged)"));
+    }
+
+    float R_wood = R_PULLUP_OHMS * (v_node_mv / (v_top_mv - v_node_mv));
     return R_wood;
 }
 

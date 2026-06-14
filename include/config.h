@@ -50,7 +50,14 @@
 
 #define R_PULLUP_OHMS      100000.0f  // Pull-up resistor value (Ohms). CRITICAL for accuracy.
 #define ADC_MAX_READING    4095.0f    // 12-bit ADC max (ESP32)
-#define VCC_PROBE_VOLTAGE  3.3f       // Voltage supplied to the voltage divider
+#define VCC_PROBE_VOLTAGE  3.3f       // Divider top voltage (probe power pin HIGH).
+                                      // Measure the pin under load and set this for best accuracy.
+#define ADC_SHORT_CIRCUIT_MV 5.0f     // Node below this (mV) = short / extremely wet
+// ESP32 ADC (11 dB) linearity knee. Above this node voltage the converter is
+// nonlinear and the divider R is compressed (the "silent zone"): readings are
+// still returned but flagged low-confidence (LPP channel 8). ~2.45 V per the
+// front-end plan (docs/ai/2026-06-05-001-feat-measurement-front-end-plan.md).
+#define ADC_LINEARITY_LIMIT_MV 2450.0f
 
 // ADC Attenuation - ADC_11db gives full 0-3.3V range on ESP32
 // Options: ADC_0db (0-1.1V), ADC_2_5db (0-1.5V), ADC_6db (0-2.2V), ADC_11db (0-3.3V)
@@ -59,10 +66,14 @@
 // Species selection (index into species_data[] in wood_species_data.h)
 #define SELECTED_WOOD_SPECIES_INDEX 0
 
-// Resistance validation bounds (Ohms) - warn if outside species calibration range
-// Typical resistive moisture meters work from ~1kOhm (very wet) to ~200MOhm (very dry)
-#define MIN_VALID_RESISTANCE_OHMS   1000.0f       // 1 kOhm
-#define MAX_VALID_RESISTANCE_OHMS   200000000.0f  // 200 MOhm
+// Resistance sanity bounds (Ohms) - coarse value-based check that drives a
+// serial warning only. The trustworthy-measurement signal is the ADC linearity
+// flag (ADC_LINEARITY_LIMIT_MV, LPP channel 8), NOT these bounds: in the silent
+// compression zone the returned R is itself corrupted, so a value bound would
+// pass readings that are quantitatively wrong. MAX is the practical ADC clip
+// (~1.55 MOhm at ~3.1 V); above it the node is rail-pinned (see front-end plan).
+#define MIN_VALID_RESISTANCE_OHMS   1000.0f       // 1 kOhm (very wet / short)
+#define MAX_VALID_RESISTANCE_OHMS   1550000.0f    // ~1.55 MOhm (practical ADC clip)
 
 // =============================================================================
 // TEMPERATURE SENSING
@@ -126,6 +137,7 @@
 #define LPP_CHANNEL_BATTERY_VOLTAGE 5  // Battery Voltage (V)
 #define LPP_CHANNEL_ESP_TEMP        6  // ESP32 Internal Chip Temperature (C)
 #define LPP_CHANNEL_TEMP_FALLBACK   7  // Digital: 1 = no valid DS18B20 reading, MC corrected with DEFAULT_WOOD_TEMP_CELSIUS
+#define LPP_CHANNEL_ADC_NONLINEAR   8  // Digital: 1 = ADC past linearity knee/saturated, returned R compressed, MC low-confidence
 
 // =============================================================================
 // DOWNLINK COMMAND BYTES (for remote configuration via LoRaWAN downlink)

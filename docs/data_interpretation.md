@@ -18,13 +18,24 @@ Each transmission contains the following fields (Cayenne LPP format):
 | Channel | Field | Type | Range | Description |
 |---------|-------|------|-------|-------------|
 | 1 | `wood_mc` | Float | 0-100% | **Primary output**: Temperature-corrected moisture content |
-| 2 | `wood_temp` | Float | -40 to 80 C | Wood temperature (DS18B20 if available, else ESP32 internal) |
+| 2 | `wood_temp` | Float | -40 to 80 C | Wood temperature (DS18B20 if available, else omitted on fallback) |
 | 3 | `indicated_mc` | Float | 0-100% | Raw moisture content before temperature correction |
 | 4 | `resistance` | Float | 0.1-10000 kOhm | Raw resistance measurement |
 | 5 | `battery` | Float | 2.8-4.2V | Battery voltage |
 | 6 | `esp_temp` | Float | -40 to 80 C | ESP32 internal chip temperature |
+| 7 | `temp_fallback` | Digital | 0/1 | 1 = no valid DS18B20, MC corrected with default temp |
+| 8 | `adc_nonlinear` | Digital | 0/1 | 1 = ADC past linearity knee/saturated, MC low-confidence |
 
-**Note:** Channels 3, 4, and 6 are optional and may be disabled to conserve payload space.
+**Note:** Channels 1, 4, 5, 7, and 8 are sent by default. Channel 2 is sent only
+when a real wood temperature was measured. Channels 3 and 6 are optional and
+disabled by default to conserve payload space.
+
+**Channel 8 (`adc_nonlinear`)** is set to 1 when the divider node pushed the ESP32
+ADC past its linearity knee (or saturated it), so the returned resistance is
+compressed and the MC is unreliable (see 1.4). It is flagged on the ADC voltage,
+not the resistance value, because in that zone the resistance itself is corrupted.
+Treat the MC of those rows as qualitative: filter them, or re-judge using the raw
+resistance (channel 4).
 
 ### 1.2 Temperature Source
 
@@ -69,6 +80,25 @@ ADC Reading -> Resistance -> Indicated MC -> Temperature Correction -> Corrected
 | Air-dried (indoor) | 8-15% | 1-20 MOhm |
 | Air-dried (outdoor, covered) | 12-20% | 200 kOhm - 5 MOhm |
 | Green/fresh | 25-30%+ | < 100 kOhm |
+
+**Measurable envelope (this front-end):** the columns above are the *physical*
+resistance of wood; they are not all measurable by this device. With a 100 kOhm
+pull-up into the ESP32 ADC, the divider node approaches the supply rail as the
+wood dries. Mapping the ADC's limits back through the divider (see the front-end
+plan in `docs/ai/`):
+- **Reliable (linear ADC):** node below ~2.45 V, i.e. wood resistance up to
+  ~290 kOhm, roughly **25% MC and wetter**. This is the only fully trustworthy band.
+- **Silent compression zone (flagged):** ~290 kOhm to ~1.55 MOhm (~20-25% MC). The
+  ADC is past its linearity knee, so the returned resistance is compressed and
+  systematically low. These rows set the `adc_nonlinear` flag (channel 8).
+- **Saturated / open (flagged):** above ~1.55 MOhm (below ~20% MC) the node is
+  rail-pinned; the kiln/air-dry range (below ~12-13% MC, hundreds of MOhm to GOhm)
+  is entirely out of reach.
+
+Extending the dry range is an electronics change (larger pull-up plus a buffer
+amplifier, or an external ADC), not an electrode-geometry change: electrode
+spacing affects resistance only logarithmically, while each ~5% MC drop multiplies
+resistance by ~10x.
 
 ---
 

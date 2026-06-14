@@ -137,7 +137,10 @@ The firmware uses `ADC_11db` attenuation for full 0-3.3V range. Each measurement
 
 3. **Measure resistance:**
    ```cpp
-   R_measured = read_wood_resistance_ohms();  // From sensor.h
+   bool adc_nonlinear = false;
+   R_measured = read_wood_resistance_ohms(adc_nonlinear);  // From sensor.h
+   // If adc_nonlinear is true, the node was past the ADC linearity knee:
+   // R_measured is compressed and not usable for calibration.
    ```
 
 4. **Calculate probe correction factor:**

@@ -167,16 +167,18 @@ This header defines `static` driver objects at header scope, so it must be inclu
 
 The ESP32 die temperature (`temprature_sens_read()`) is never used for the MC correction - it reads tens of degrees above ambient. It remains available on debug LPP channel 6 and in the serial output.
 
-**Resistance Measurement (`read_wood_resistance_ohms()`):**
+**Resistance Measurement (`read_wood_resistance_ohms(bool &adc_nonlinear)`):**
 - Probe power pin must already be HIGH (toggled by main code)
 - Waits for ADC stabilization delay
-- Averages 10 samples with 5ms spacing
+- Open-circuit gate on the raw count (calibration-independent)
+- Samples node voltage via `analogReadMilliVolts()` (eFuse-calibrated); trimmed mean (drop min+max) over the samples to reject EMI spikes
+- Sets `adc_nonlinear` when the node is past the ADC linearity knee or saturated
 - Handles edge cases: ADC saturation (open circuit) and near-zero (short circuit)
-- Formula: `R_wood = R_pullup * (ADC / (ADC_MAX - ADC))`
+- Formula: `R_wood = R_pullup * V_node / (V_top - V_node)`
 
-**Validation (`is_resistance_in_valid_range()`):**
-- Valid range: 1 kOhm to 200 MOhm
-- Warnings printed for out-of-range readings
+**Validation:**
+- `is_resistance_in_valid_range()`: coarse sanity bounds (1 kOhm to ~1.55 MOhm), serial warning only
+- Trustworthy-measurement signal is the ADC linearity flag (`adc_nonlinear`, LPP ch 8), set on the node voltage (`ADC_LINEARITY_LIMIT_MV`), not on the resistance value
 
 ---
 
@@ -452,7 +454,7 @@ PMIC: AXP2101 (T-Beam v1.2) initialized OK.
 [LoRaWAN] Activating OTAA...
 [LoRaWAN] Session restored from saved state!
 [Phase] Sensor Measurement
-[Sensor] Avg Raw ADC: 1234.56
+[Sensor] Node voltage (trimmed mean): 1034.60 mV
 Wood Resistance: 45.67 kOhms
 Indicated MC: 12.34 %
 [Sensor] DS18B20 temp: 22.5 C

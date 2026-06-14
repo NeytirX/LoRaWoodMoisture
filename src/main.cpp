@@ -263,7 +263,8 @@ void setup() {
     digitalWrite(MOISTURE_PROBE_POWER_PIN, HIGH);
 
     // --- Resistance Measurement ---
-    float R_ohms = read_wood_resistance_ohms();
+    bool adc_nonlinear = false;
+    float R_ohms = read_wood_resistance_ohms(adc_nonlinear);
     last_R_kOhms = R_ohms / 1000.0f;
     DEBUG_PRINT(F("Wood Resistance: "));
     DEBUG_PRINT(last_R_kOhms);
@@ -328,12 +329,18 @@ void setup() {
     // Always sent: 1 = corrected MC used DEFAULT_WOOD_TEMP_CELSIUS, not a
     // measured temp - lets downstream analysis filter affected readings
     lpp.addDigitalInput(LPP_CHANNEL_TEMP_FALLBACK, wood_temp_fallback ? 1 : 0);
+    // Always sent: 1 = the ADC was past its linearity knee or saturated, so the
+    // returned resistance is compressed (silent zone) and the MC is low-confidence.
+    // Flagged on the ADC voltage, not the R value (see read_wood_resistance_ohms).
+    lpp.addDigitalInput(LPP_CHANNEL_ADC_NONLINEAR, adc_nonlinear ? 1 : 0);
+    // Raw resistance: paired with the quality flag so flagged readings can be
+    // re-judged offline. Cheap (4 bytes) and the main lever for dry-end analysis.
+    if (last_R_kOhms >= 0)
+        lpp.addAnalogInput(LPP_CHANNEL_RESISTANCE, last_R_kOhms);
 
     // Optional debug channels (uncomment to include in payload)
     // if (last_mc_indicated >= 0)
     //     lpp.addAnalogInput(LPP_CHANNEL_INDICATED_MC, last_mc_indicated);
-    // if (last_R_kOhms >= 0)
-    //     lpp.addAnalogInput(LPP_CHANNEL_RESISTANCE, last_R_kOhms);
     // if (last_esp_temp_c > -50)
     //     lpp.addTemperature(LPP_CHANNEL_ESP_TEMP, last_esp_temp_c);
 

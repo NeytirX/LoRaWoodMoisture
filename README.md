@@ -185,10 +185,13 @@ The device transmits data using Cayenne Low Power Payload format:
 | 5 | Analog Input | Battery Voltage (V) | Float |
 | 6 | Temperature | ESP32 Internal Temp (C) | Float |
 | 7 | Digital Input | Temp fallback flag | 0/1 |
+| 8 | Digital Input | ADC nonlinear flag | 0/1 |
 
-**Note:** Channels 3, 4, and 6 are commented out by default to conserve payload space. Enable in `main.cpp` if needed for debugging.
+**Note:** Channels 3 and 6 are commented out by default to conserve payload space. Channel 4 (resistance) is enabled so flagged readings can be re-judged offline. Enable 3/6 in `main.cpp` if needed for debugging.
 
 **Channel 7** is always sent: `1` means no valid DS18B20 reading was available, so the corrected MC was computed with the configured default wood temperature (`DEFAULT_WOOD_TEMP_CELSIUS`, 21 C) and channel 2 is omitted. Filter or re-correct these readings during analysis.
+
+**Channel 8** is always sent: `1` means the divider node pushed the ESP32 ADC past its linearity knee (`ADC_LINEARITY_LIMIT_MV`) or saturated it, so the returned resistance is compressed and the MC is low-confidence. Typically very dry wood. Treat those rows as qualitative and re-judge with the raw resistance (channel 4).
 
 ---
 

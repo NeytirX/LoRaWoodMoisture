@@ -667,7 +667,7 @@ Saving nonces to NVS...
 Battery: 3890 mV (3.89 V)
 --- Phase 5: Sensor Measurement ---
 DS18B20 Temp: 22.3 C
-Avg Raw ADC: 1234.56
+[Sensor] Node voltage (trimmed mean): 1034.60 mV
 Wood Resistance: 45.67 kOhms
 Indicated MC: 12.34 %
 Temp Correction Factor: 0.1 % MC
