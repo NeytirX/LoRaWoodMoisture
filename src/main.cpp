@@ -20,6 +20,16 @@
 #include "sensor.h"
 #include <CayenneLPP.h>
 
+#ifdef P2P_MODE
+// === TEMPORARY bench bring-up only - NOT a deployment path ===================
+// Shared raw-LoRa wire format with the Heltec receiver. Pulled from
+// receiver/include via -I in the [env:tbeam-p2p] build ONLY; the default
+// LoRaWAN build never sees this. Remove with the rest of the P2P_MODE blocks
+// once an EU433 gateway exists and the LoRaWAN path is the only transmitter.
+#include "p2p_frame.h"
+#define P2P_NODE_ID 1   // single bench node; matches the smoke transmitter
+#endif
+
 #ifdef USE_AXP_POWER_MANAGEMENT
 #include <XPowersAXP192.tpp>
 #include <XPowersAXP2101.tpp>
@@ -96,6 +106,10 @@ void setup() {
     DEBUG_PRINT(FIRMWARE_VERSION_MAJOR); DEBUG_PRINT(F("."));
     DEBUG_PRINT(FIRMWARE_VERSION_MINOR); DEBUG_PRINT(F("."));
     DEBUG_PRINTLN(FIRMWARE_VERSION_PATCH);
+
+#ifdef P2P_MODE
+    DEBUG_PRINTLN(F("*** TEMPORARY P2P BENCH MODE - NOT LoRaWAN, NOT FOR DEPLOYMENT ***"));
+#endif
 
     print_wakeup_reason();
 
@@ -185,6 +199,25 @@ void setup() {
     // default VSPI pins) - bind the default SPIClass to it before radio.begin()
     SPI.begin(LORA_SCK_PIN, LORA_MISO_PIN, LORA_MOSI_PIN, LORA_CS_PIN);
 
+#ifdef P2P_MODE
+    // === TEMPORARY P2P BRING-UP PATH - NOT THE DEPLOYMENT PATH ===============
+    // Drive the SX1262 as a raw private-LoRa transmitter on the channel the
+    // Heltec receiver listens on, instead of joining a LoRaWAN network. No
+    // OTAA, no session, no downlink. This exists ONLY so real measurements can
+    // be watched end-to-end before an EU433 gateway is available. The thesis
+    // data path stays LoRaWAN (the #else branch). Delete once the gateway
+    // exists; the shared wire format lives in receiver/include/p2p_frame.h.
+    int state = radio.begin(P2P_FREQUENCY_MHZ, P2P_BANDWIDTH_KHZ, P2P_SPREADING_FACTOR,
+                            P2P_CODING_RATE, P2P_SYNC_WORD, P2P_TX_POWER_DBM,
+                            P2P_PREAMBLE_LENGTH);
+    if (state != RADIOLIB_ERR_NONE) {
+        DEBUG_PRINT(F("[Radio] P2P init FAILED, code: "));
+        DEBUG_PRINTLN(state);
+        deep_sleep_with_timer(LORAWAN_JOIN_RETRY_SLEEP_SECONDS);
+        return;
+    }
+    DEBUG_PRINTLN(F("[Radio] SX1262 OK - *** TEMPORARY P2P MODE *** (no LoRaWAN)"));
+#else
     // Initialize the SX1262 radio
     int state = radio.begin();
     if (state != RADIOLIB_ERR_NONE) {
@@ -252,6 +285,7 @@ void setup() {
         }
         return;
     }
+#endif // P2P_MODE (LoRaWAN join/restore is the #else deployment path)
 
     // =====================================================================
     // PHASE 5: Sensor Measurement
@@ -353,6 +387,33 @@ void setup() {
     // PHASE 7: LoRaWAN Uplink (with downlink receive)
     // =====================================================================
     else {
+#ifdef P2P_MODE
+        // === TEMPORARY P2P TRANSMIT - NOT LoRaWAN ============================
+        // Wrap the freshly measured Cayenne LPP in the bench frame envelope and
+        // send it raw to the Heltec receiver. No join, no downlink, no ACK.
+        // Same payload bytes the LoRaWAN path sends, just a different carrier.
+        // Remove with the rest of the P2P_MODE blocks once the gateway exists.
+        DEBUG_PRINTLN(F("[Phase] P2P Transmit (TEMPORARY)"));
+        esp_task_wdt_reset();
+
+        uint8_t lppLen = lpp.getSize();
+        if (lppLen > P2P_MAX_LPP) lppLen = P2P_MAX_LPP;
+        uint8_t frame[P2P_HEADER_LEN + P2P_MAX_LPP];
+        frame[0] = P2P_MAGIC_0;
+        frame[1] = P2P_MAGIC_1;
+        frame[2] = P2P_PROTO_VERSION;
+        frame[3] = P2P_NODE_ID;
+        frame[4] = lppLen;
+        memcpy(frame + P2P_HEADER_LEN, lpp.getBuffer(), lppLen);
+
+        int txResult = radio.transmit(frame, P2P_HEADER_LEN + lppLen);
+        if (txResult == RADIOLIB_ERR_NONE) {
+            DEBUG_PRINTLN(F("[TX] P2P frame sent"));
+        } else {
+            DEBUG_PRINT(F("[TX] P2P transmit FAILED, code: "));
+            DEBUG_PRINTLN(txResult);
+        }
+#else
         DEBUG_PRINTLN(F("[Phase] LoRaWAN Uplink"));
         esp_task_wdt_reset();
 
@@ -401,6 +462,7 @@ void setup() {
                 session_save_rtc(sessionPtr, RADIOLIB_LORAWAN_SESSION_BUF_SIZE);
             }
         }
+#endif // P2P_MODE transmit branch
     }
 
     // =====================================================================
