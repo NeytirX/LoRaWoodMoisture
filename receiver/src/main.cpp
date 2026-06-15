@@ -18,6 +18,7 @@
 #include <WiFiMulti.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#include <SSD1306Wire.h>
 
 #include "p2p_frame.h"
 #include "secrets.h"
@@ -36,10 +37,30 @@
 #define HELTEC_TCXO_VOLTAGE 1.8f
 
 // =============================================================================
+// HELTEC WIFI LORA 32 V3 - BUILT-IN OLED (SSD1306 128x64, its own I2C bus)
+// =============================================================================
+#define HELTEC_OLED_SDA   17
+#define HELTEC_OLED_SCL   18
+#define HELTEC_OLED_RST   21
+#define HELTEC_VEXT_PIN   36   // drive LOW to power the Vext rail that feeds the OLED
+
+// =============================================================================
 // GLOBALS
 // =============================================================================
 SX1262 radio = new Module(HELTEC_LORA_NSS, HELTEC_LORA_DIO1,
                           HELTEC_LORA_RST, HELTEC_LORA_BUSY);
+
+SSD1306Wire display(0x3c, HELTEC_OLED_SDA, HELTEC_OLED_SCL);
+
+// Latest reading mirrored to the OLED. Until the first packet decodes a wood_mc
+// value, haveReading stays false and the screen shows the waiting message.
+bool     haveReading  = false;
+float    dispMc       = 0.0f;
+float    dispTemp     = NAN;
+int      dispRssi     = 0;
+uint8_t  dispNode     = 0;
+bool     dispFallback = false;
+uint32_t lastReadingMs = 0;
 
 WiFiClient   wifiClient;
 PubSubClient mqtt(wifiClient);
@@ -48,6 +69,64 @@ bool mqttEnabled = false;   // set in setup() iff at least one AP connected
 
 volatile bool packetReady = false;
 void IRAM_ATTR onPacketReceived() { packetReady = true; }
+
+// =============================================================================
+// OLED DISPLAY
+// =============================================================================
+static void display_init() {
+    // The V3 powers the OLED through the Vext rail; pull GPIO36 LOW to enable it,
+    // then pulse the panel's reset line before talking to it over I2C.
+    pinMode(HELTEC_VEXT_PIN, OUTPUT);
+    digitalWrite(HELTEC_VEXT_PIN, LOW);
+    pinMode(HELTEC_OLED_RST, OUTPUT);
+    digitalWrite(HELTEC_OLED_RST, LOW);
+    delay(20);
+    digitalWrite(HELTEC_OLED_RST, HIGH);
+    delay(20);
+
+    display.init();
+    display.flipScreenVertically();   // panel is mounted upside-down on the V3
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+}
+
+static void display_waiting() {
+    display.clear();
+    display.setFont(ArialMT_Plain_16);
+    display.setTextAlignment(TEXT_ALIGN_CENTER);
+    display.drawString(64, 14, "Waiting for");
+    display.drawString(64, 34, "sensor...");
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+    display.display();
+}
+
+// Draws the latest reading from the disp* globals. Called on each new packet and
+// once a second from loop() so the "Ns ago" age keeps ticking.
+static void display_reading() {
+    display.clear();
+
+    // Header line: node id (left) and signal strength (right).
+    display.setFont(ArialMT_Plain_10);
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+    display.drawString(0, 0, "Node " + String(dispNode));
+    display.setTextAlignment(TEXT_ALIGN_RIGHT);
+    display.drawString(128, 0, String(dispRssi) + " dBm");
+
+    // The number that matters: wood moisture content, large and centered.
+    display.setFont(ArialMT_Plain_24);
+    display.setTextAlignment(TEXT_ALIGN_CENTER);
+    display.drawString(64, 16, String(dispMc, 1) + " %");
+
+    // Footer: wood temperature, temp-fallback marker, and reading age.
+    display.setFont(ArialMT_Plain_10);
+    String foot;
+    if (!isnan(dispTemp)) foot += String(dispTemp, 1) + "C";
+    if (dispFallback)     foot += " t?";
+    foot += "  " + String((millis() - lastReadingMs) / 1000) + "s ago";
+    display.drawString(64, 52, foot);
+
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+    display.display();
+}
 
 // =============================================================================
 // LPP DECODE HELPERS
@@ -221,6 +300,18 @@ static void handle_packet() {
     bool ok = decode_lpp(&buf[P2P_HEADER_LEN], lppLen, doc);
     if (!ok) doc["decode_partial"] = true;
 
+    // --- Update the OLED if this frame carried a moisture reading ---
+    if (!doc["wood_mc"].isNull()) {
+        dispMc        = doc["wood_mc"].as<float>();
+        dispTemp      = doc["wood_temp_c"].isNull() ? NAN : doc["wood_temp_c"].as<float>();
+        dispFallback  = !doc["temp_fallback"].isNull() && doc["temp_fallback"].as<int>() != 0;
+        dispRssi      = (int)rssi;
+        dispNode      = nodeId;
+        lastReadingMs = millis();
+        haveReading   = true;
+        display_reading();
+    }
+
     // --- Output: serial always, MQTT when available ---
     char out[384];
     size_t n = serializeJson(doc, out, sizeof(out));
@@ -245,6 +336,9 @@ void setup() {
     Serial.printf("[RX] channel: %.3f MHz  SF%d  BW%.0f  CR4/%d  sync 0x%02X\n",
                   P2P_FREQUENCY_MHZ, P2P_SPREADING_FACTOR, P2P_BANDWIDTH_KHZ,
                   P2P_CODING_RATE, P2P_SYNC_WORD);
+
+    display_init();
+    display_waiting();
 
     SPI.begin(HELTEC_LORA_SCK, HELTEC_LORA_MISO, HELTEC_LORA_MOSI, HELTEC_LORA_NSS);
     int st = radio.begin(P2P_FREQUENCY_MHZ, P2P_BANDWIDTH_KHZ, P2P_SPREADING_FACTOR,
@@ -274,4 +368,11 @@ void loop() {
         handle_packet();
     }
     if (mqttEnabled && mqtt.connected()) mqtt.loop();
+
+    // Refresh the reading once a second so the "Ns ago" age stays current.
+    static uint32_t lastDisplayMs = 0;
+    if (haveReading && millis() - lastDisplayMs >= 1000) {
+        lastDisplayMs = millis();
+        display_reading();
+    }
 }
