@@ -560,6 +560,15 @@ void process_downlink(uint8_t *data, uint8_t len) {
 // BATTERY-AWARE SLEEP INTERVAL
 // =============================================================================
 uint32_t calculate_sleep_interval() {
+#ifdef P2P_MODE
+    // TEMPORARY demo cadence: the P2P bench build transmits every
+    // P2P_DEMO_INTERVAL_SECONDS so a live demo shows fresh wood-MC readings
+    // instead of one per hour. Bypasses the deployment interval and the
+    // battery multipliers on purpose. Remove with the rest of the P2P_MODE
+    // blocks once the gateway exists.
+    return P2P_DEMO_INTERVAL_SECONDS;
+#endif
+
     uint32_t interval = current_interval_seconds;
 
     #ifdef USE_AXP_POWER_MANAGEMENT
