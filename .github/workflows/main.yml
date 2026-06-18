@@ -1,0 +1,48 @@
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-and-test:
+    name: Build, Test, and Analyze
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+            ~/.platformio/packages
+            ~/.platformio/platforms
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO & cppcheck
+        run: |
+          pip install --upgrade platformio
+          sudo apt-get update && sudo apt-get install -y cppcheck
+
+      - name: Run static analysis (cppcheck)
+        run: cppcheck --enable=warning,style --suppress=missingInclude --inline-suppr --error-exitcode=1 src/ include/
+
+      - name: Build ttgo-t-beam
+        run: pio run -e ttgo-t-beam
+
+      - name: Build tbeam-p2p
+        run: pio run -e tbeam-p2p
+
+      - name: Run native unit tests
+        run: pio test -e native
