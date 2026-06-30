@@ -1,7 +1,7 @@
 // src/main.cpp - Wood Moisture Sensor Firmware (LoRaWAN via RadioLib)
 //
 // Target: TTGO T-Beam v1.1/v1.2 (ESP32 + SX1262 + AXP192/AXP2101)
-// LoRaWAN: RadioLib with EU433 band, OTAA.
+// LoRaWAN: RadioLib with EU868 band, OTAA.
 //
 // Single-file firmware: the whole measure-send-sleep cycle runs once in
 // setup(), then the ESP32 deep-sleeps and restarts on timer wake. loop() is
@@ -60,9 +60,9 @@ uint32_t calculate_sleep_interval();
 // SX1262 radio module: Module(NSS, DIO1, RST, BUSY)
 SX1262 radio = new Module(LORA_CS_PIN, LORA_DIO1_PIN, LORA_RST_PIN, LORA_BUSY_PIN);
 
-// LoRaWAN node bound to the radio, using EU433 region
-// EU433 is a built-in region in RadioLib
-LoRaWANNode node(&radio, &EU433);
+// LoRaWAN node bound to the radio, using EU868 region
+// EU868 is a built-in region in RadioLib
+LoRaWANNode node(&radio, &EU868);
 
 // Note: RadioLib v7.6.0 uses internal buffers accessed via getBufferNonces()/getBufferSession().
 // We store copies in NVS (nonces) and RTC RAM (session) for persistence across sleep/power cycles.
@@ -171,15 +171,26 @@ void setup() {
     // Read battery voltage immediately after PMIC init and abort before the
     // expensive radio init / OTAA join: on a critically low battery there is no
     // point spending the most power-hungry operation just to skip the cycle.
+    // When USB is present, skip the abort — the device runs fine on USB power
+    // regardless of battery state (warn only).
     #ifdef USE_AXP_POWER_MANAGEMENT
     if (pmic_initialized) {
         last_battery_v = pmic_batt_voltage();
         DEBUG_PRINT(F("[Battery] Voltage: ")); DEBUG_PRINT(last_battery_v); DEBUG_PRINTLN(F(" V"));
+        bool usb_present = PMU2101 ? PMU2101->isVbusIn() : false;
         if (last_battery_v < CRITICAL_BATTERY_THRESHOLD_V) {
-            DEBUG_PRINTLN(F("[Battery] CRITICAL! Skipping measurement. Extended sleep."));
-            uint32_t sleep_s = current_interval_seconds * CRITICAL_BATTERY_SLEEP_MULTIPLIER;
-            deep_sleep_with_timer(sleep_s);
-            return;
+            if (usb_present) {
+                if (last_battery_v < BATTERY_ABSENT_THRESHOLD_V) {
+                    DEBUG_PRINTLN(F("[Battery] No battery detected, USB present. Continuing on USB power."));
+                } else {
+                    DEBUG_PRINTLN(F("[Battery] Low battery, but USB present. Continuing on USB power."));
+                }
+            } else {
+                DEBUG_PRINTLN(F("[Battery] CRITICAL! Skipping measurement. Extended sleep."));
+                uint32_t sleep_s = current_interval_seconds * CRITICAL_BATTERY_SLEEP_MULTIPLIER;
+                deep_sleep_with_timer(sleep_s);
+                return;
+            }
         }
     }
     #endif
@@ -572,7 +583,8 @@ uint32_t calculate_sleep_interval() {
     uint32_t interval = current_interval_seconds;
 
     #ifdef USE_AXP_POWER_MANAGEMENT
-    if (last_battery_v > 0) {
+    bool usb_present = PMU2101 ? PMU2101->isVbusIn() : false;
+    if (!usb_present && last_battery_v > 0) {
         if (last_battery_v < CRITICAL_BATTERY_THRESHOLD_V) {
             interval *= CRITICAL_BATTERY_SLEEP_MULTIPLIER;
             DEBUG_PRINT(F("[Battery] CRITICAL ("));

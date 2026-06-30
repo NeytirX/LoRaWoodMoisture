@@ -2,7 +2,7 @@
 //
 // Every tunable parameter for the wood moisture sensor firmware:
 // pins, thresholds, intervals, LPP channels, and downlink command bytes.
-// Uses RadioLib (SX1262 + EU433).
+// Uses RadioLib (SX1262 + EU868).
 
 #ifndef CONFIG_H
 #define CONFIG_H
@@ -113,6 +113,7 @@
 // =============================================================================
 #define LOW_BATTERY_THRESHOLD_V        3.4f    // Below this, extend sleep to conserve power
 #define CRITICAL_BATTERY_THRESHOLD_V   3.2f    // Below this, sleep even longer
+#define BATTERY_ABSENT_THRESHOLD_V     0.5f    // Below this + USB present = no battery connected
 #define LOW_BATTERY_SLEEP_MULTIPLIER   2       // 2x normal interval when low
 #define CRITICAL_BATTERY_SLEEP_MULTIPLIER 4    // 4x normal interval when critical
 
