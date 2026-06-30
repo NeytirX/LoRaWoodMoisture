@@ -12,9 +12,9 @@ This firmware is the consolidated version incorporating improvements from multip
 - **Species-Specific Calibration:** Supports multiple wood species with dedicated coefficients (A, B parameters)
 - **Temperature Compensation:** Implements the FPL-GTR-6 Figure 5 correction grid (Celsius, digitized from the original chart) via bilinear interpolation
 - **DS18B20 Temperature Sensor:** Optional 1-Wire temperature probe for direct wood temperature measurement; without a valid reading the MC correction uses a configured default temperature and the uplink is flagged
-- **LoRaWAN Connectivity:** EU433 band, OTAA, Cayenne LPP payload format for IoT integration
+- **LoRaWAN Connectivity:** EU868/EU433 (runtime-selectable via NVS, single firmware binary for both board types), OTAA, Cayenne LPP payload format for IoT integration
 - **Session Persistence:** LoRaWAN nonces saved to NVS and session saved to RTC memory across deep sleep cycles (avoids costly OTAA rejoin every wake)
-- **Remote Configuration:** Downlink commands for adjusting measurement interval, wood species, TX power, and forcing rejoin
+- **Remote Configuration:** Downlink commands for adjusting measurement interval, wood species, LoRaWAN region, TX power, and forcing rejoin
 - **Battery-Aware Power Management:** AXP192/AXP2101 PMIC integration (auto-detected, T-Beam v1.1/v1.2) with critical voltage protection and adaptive sleep intervals (2x/4x multiplier when battery is low/critical)
 - **Hardware Watchdog:** ESP32 Task Watchdog Timer prevents firmware hangs (120s timeout)
 - **Ultra-Low Power Design:** Deep sleep operation with configurable intervals (default: 1 hour)
@@ -152,6 +152,7 @@ Send downlink messages on any port to reconfigure the device:
 | Set Species | `0x02 XX` | Set wood species index (XX = 0 to NUM_WOOD_SPECIES-1) |
 | Force Rejoin | `0x03` | Force a fresh OTAA join on next wake |
 | Set TX Power | `0x04 XX` | Set TX power index |
+| Set Region | `0x05 XX` | Set LoRaWAN region (XX = 0: EU868, 1: EU433). Persisted in NVS, forces rejoin |
 
 ### Adding Wood Species
 

@@ -60,9 +60,9 @@ uint32_t calculate_sleep_interval();
 // SX1262 radio module: Module(NSS, DIO1, RST, BUSY)
 SX1262 radio = new Module(LORA_CS_PIN, LORA_DIO1_PIN, LORA_RST_PIN, LORA_BUSY_PIN);
 
-// LoRaWAN node bound to the radio, using EU868 region
-// EU868 is a built-in region in RadioLib
-LoRaWANNode node(&radio, &EU868);
+// LoRaWAN node bound to the radio — region selected at startup from NVS
+// (default EU868, changeable via downlink command 0x05)
+LoRaWANNode* node = nullptr;
 
 // Note: RadioLib v7.6.0 uses internal buffers accessed via getBufferNonces()/getBufferSession().
 // We store copies in NVS (nonces) and RTC RAM (session) for persistence across sleep/power cycles.
@@ -202,6 +202,22 @@ void setup() {
     sensor_init();
 
     // =====================================================================
+    // REGION DETECTION: read from NVS, default EU868
+    // =====================================================================
+    const LoRaWANBand_t* region = &EU868;
+    {
+        Preferences prefs;
+        prefs.begin(NVS_NAMESPACE, true);
+        uint8_t regionVal = prefs.getUChar(NVS_KEY_REGION, 0);
+        prefs.end();
+        if (regionVal == 1) region = &EU433;
+    }
+    DEBUG_PRINT(F("[Region] ")); DEBUG_PRINTLN(region == &EU433 ? "EU433" : "EU868");
+
+    // Construct LoRaWAN node with detected region
+    node = new LoRaWANNode(&radio, region);
+
+    // =====================================================================
     // PHASE 3: Radio Init + LoRaWAN Join/Restore
     // =====================================================================
     DEBUG_PRINTLN(F("[Phase] Radio Init"));
@@ -250,21 +266,21 @@ void setup() {
     uint8_t noncesTemp[RADIOLIB_LORAWAN_NONCES_BUF_SIZE] = {0};
     size_t noncesLen = session_load_nonces(noncesTemp, sizeof(noncesTemp));
     if (noncesLen > 0) {
-        node.setBufferNonces(noncesTemp);
+        node->setBufferNonces(noncesTemp);
     }
 
     // Load session from RTC (survives deep sleep only)
     uint8_t sessionTemp[RADIOLIB_LORAWAN_SESSION_BUF_SIZE] = {0};
     size_t sessionLen = 0;
     if (session_restore_rtc(sessionTemp, sizeof(sessionTemp), sessionLen)) {
-        node.setBufferSession(sessionTemp);
+        node->setBufferSession(sessionTemp);
     }
 
     // --- Attempt OTAA activation (join or restore) ---
     DEBUG_PRINTLN(F("[LoRaWAN] Activating OTAA..."));
-    node.beginOTAA(joinEUI, devEUI, nwkKey, appKey);
+    node->beginOTAA(joinEUI, devEUI, nwkKey, appKey);
 
-    state = node.activateOTAA();
+    state = node->activateOTAA();
 
     if (state == RADIOLIB_LORAWAN_SESSION_RESTORED) {
         DEBUG_PRINTLN(F("[LoRaWAN] Session restored from saved state!"));
@@ -274,7 +290,7 @@ void setup() {
         join_retry_count = 0;
 
         // Save the new nonces to NVS (they only change on join)
-        uint8_t* noncesPtr = node.getBufferNonces();
+        uint8_t* noncesPtr = node->getBufferNonces();
         if (noncesPtr != nullptr) {
             session_save_nonces(noncesPtr, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
         }
@@ -434,7 +450,7 @@ void setup() {
         // sendReceive: sends uplink on fPort 1, receives any downlink
         // Returns: RADIOLIB_ERR_NONE (no downlink), >0 (downlink fPort),
         //          or negative error code
-        int txResult = node.sendReceive(
+        int txResult = node->sendReceive(
             lpp.getBuffer(), lpp.getSize(),  // uplink data
             1,                                // fPort = 1
             downlinkPayload, &downlinkLen     // downlink buffer
@@ -454,12 +470,12 @@ void setup() {
             }
 
             // Save session after successful TX (frame counters updated)
-            uint8_t* sessionPtr = node.getBufferSession();
+            uint8_t* sessionPtr = node->getBufferSession();
             if (sessionPtr != nullptr) {
                 session_save_rtc(sessionPtr, RADIOLIB_LORAWAN_SESSION_BUF_SIZE);
             }
             // Also save nonces in case they were updated
-            uint8_t* noncesPtr2 = node.getBufferNonces();
+            uint8_t* noncesPtr2 = node->getBufferNonces();
             if (noncesPtr2 != nullptr) {
                 session_save_nonces(noncesPtr2, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
             }
@@ -468,7 +484,7 @@ void setup() {
             DEBUG_PRINTLN(txResult);
 
             // On TX failure, still save session to preserve frame counter
-            uint8_t* sessionPtr = node.getBufferSession();
+            uint8_t* sessionPtr = node->getBufferSession();
             if (sessionPtr != nullptr) {
                 session_save_rtc(sessionPtr, RADIOLIB_LORAWAN_SESSION_BUF_SIZE);
             }
@@ -554,8 +570,24 @@ void process_downlink(uint8_t *data, uint8_t len) {
             if (len >= 2) {
                 DEBUG_PRINT(F("  [DL] TX power index: "));
                 DEBUG_PRINTLN(data[1]);
-                // RadioLib can set TX power via node.setTxPower(data[1])
+                // RadioLib can set TX power via node->setTxPower(data[1])
                 // but ADR typically manages this. Left for future use.
+            }
+            break;
+
+        case DOWNLINK_CMD_SET_REGION:
+            if (len >= 2 && data[1] <= 1) {
+                Preferences prefs;
+                prefs.begin(NVS_NAMESPACE, false);
+                prefs.putUChar(NVS_KEY_REGION, data[1]);
+                prefs.end();
+                DEBUG_PRINT(F("  [DL] Region -> "));
+                DEBUG_PRINTLN(data[1] == 1 ? "EU433" : "EU868");
+                // Force rejoin so the new region takes effect on next boot
+                session_invalidate();
+                join_retry_count = 0;
+            } else {
+                DEBUG_PRINTLN(F("  [DL] Invalid region (0=EU868, 1=EU433)"));
             }
             break;
 

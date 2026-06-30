@@ -148,11 +148,13 @@
 #define DOWNLINK_CMD_SET_SPECIES    0x02  // + 1 byte: species index
 #define DOWNLINK_CMD_FORCE_REJOIN   0x03  // No extra bytes - forces a fresh OTAA join
 #define DOWNLINK_CMD_SET_TX_POWER   0x04  // + 1 byte: TX power index
+#define DOWNLINK_CMD_SET_REGION     0x05  // + 1 byte: 0=EU868, 1=EU433 (persisted in NVS)
 
 // =============================================================================
 // NVS (Non-Volatile Storage) KEYS for RadioLib session persistence
 // =============================================================================
 #define NVS_NAMESPACE       "lorawan"
 #define NVS_KEY_NONCES      "nonces"
+#define NVS_KEY_REGION      "region"       // 0=EU868, 1=EU433 (persisted via downlink)
 
 #endif // CONFIG_H

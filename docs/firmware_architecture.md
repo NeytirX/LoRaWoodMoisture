@@ -264,14 +264,29 @@ Where A and B are species-specific coefficients from FPL GTR-6 Table 1.
 ### 2.6 LoRaWAN Communication Module
 
 **Library:** RadioLib (pinned `^7.1.0`, resolves to 7.7.1 as of 2026-06-04)
-**Region:** EU433
+**Region:** Runtime-selectable (EU868 default, EU433 via NVS — single firmware binary for both board types)
 **Radio:** SX1262 (T-Beam v1.1/v1.2)
 **Payload Format:** Cayenne LPP
+
+**Region Detection (NVS-based):**
+```cpp
+const LoRaWANBand_t* region = &EU868;  // default
+{
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+    uint8_t regionVal = prefs.getUChar(NVS_KEY_REGION, 0);
+    prefs.end();
+    if (regionVal == 1) region = &EU433;
+}
+node = new LoRaWANNode(&radio, region);
+```
+Region is stored in NVS (`lorawan` namespace, `region` key: 0=EU868, 1=EU433). Changeable via downlink command `0x05`. On first boot with no NVS value, defaults to EU868.
 
 **Radio Initialization:**
 ```cpp
 SX1262 radio = new Module(LORA_CS_PIN, LORA_DIO1_PIN, LORA_RST_PIN, LORA_BUSY_PIN);
-LoRaWANNode node(&radio, &EU433);
+// LoRaWANNode constructed dynamically after region detection
+node = new LoRaWANNode(&radio, region);
 radio.begin();
 ```
 
@@ -301,6 +316,7 @@ int txResult = node.sendReceive(data, len, fPort, downBuf, &downLen);
 | 0x02 | Set Species | 1 byte (species index) | Changes `selected_species_index` |
 | 0x03 | Force Rejoin | None | Invalidates session, will rejoin on next boot |
 | 0x04 | Set TX Power | 1 byte (power index) | Reserved for ADR override |
+| 0x05 | Set Region | 1 byte (0=EU868, 1=EU433) | Persists to NVS, invalidates session, rejoin on next boot |
 
 ---
 
