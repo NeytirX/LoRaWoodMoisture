@@ -38,6 +38,9 @@ jobs:
       - name: Run static analysis (cppcheck)
         run: cppcheck --enable=warning,style --suppress=missingInclude --inline-suppr --error-exitcode=1 src/ include/
 
+      - name: Provide placeholder LoRaWAN keys for CI build
+        run: cp include/lorawan_keys_template.h include/lorawan_keys.h
+
       - name: Build ttgo-t-beam
         run: pio run -e ttgo-t-beam
 
