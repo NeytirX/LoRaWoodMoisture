@@ -727,7 +727,8 @@ void setup_axp() {
         DEBUG_PRINTLN(F("PMIC: AXP2101 (T-Beam v1.2) initialized OK."));
         pmic_initialized = true;
 
-        PMU2101->enableALDO2();  // LoRa radio power
+        PMU2101->setALDO2Voltage(3300);  // LoRa radio power (3.3V for SX1262)
+        PMU2101->enableALDO2();
         PMU2101->disableALDO3(); // GPS off
         PMU2101->enableDC1();    // ESP32 core power
         PMU2101->clearIrqStatus();
