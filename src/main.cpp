@@ -151,7 +151,7 @@ void setup() {
     DEBUG_PRINT(F("Selected species ["));
     DEBUG_PRINT(selected_species_index);
     DEBUG_PRINT(F("]: "));
-    const char* name_ptr = (const char*)pgm_read_ptr(&sp.name);
+    const char* name_ptr = reinterpret_cast<const char*>(pgm_read_ptr(&sp.name));
     char name_buf[40];
     strncpy_P(name_buf, name_ptr, sizeof(name_buf) - 1);
     name_buf[sizeof(name_buf) - 1] = '\0';
