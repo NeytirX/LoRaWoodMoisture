@@ -4,7 +4,9 @@
 // src/main.cpp only — a second includer causes duplicate-symbol / split-state bugs.
 //
 // Manages:
-//   - DS18B20 temperature sensor (1-Wire), with fallback to ESP32 die temp
+//   - DS18B20 temperature sensor (1-Wire), with fallback to a configured default
+//     temp (DEFAULT_WOOD_TEMP_CELSIUS, flagged in payload); ESP32 die temp is
+//     diagnostic-only
 //   - Resistive wood moisture probe (voltage divider + ADC)
 //   - ADC attenuation configuration
 //   - Resistance range validation

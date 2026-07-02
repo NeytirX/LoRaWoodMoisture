@@ -1,5 +1,6 @@
 // include/wood_mc_math.h
-// Off-target-testable copy of the pure moisture-content math (FPL GTR-6).
+// Single home of the pure moisture-content math (FPL GTR-6), used by main.cpp
+// and the native tests.
 //
 // Why this header exists
 // ----------------------
@@ -54,7 +55,6 @@ namespace wood_mc {
 
 // Indicated MC from wood resistance, per species coefficients:
 //   M = 10^(A + B * log10(R_kOhms))
-// Transcribed from src/main.cpp::calculate_indicated_mc.
 inline float calculate_indicated_mc(float R_wood_ohms, const WoodSpecies& species) {
     if (R_wood_ohms <= 0) return -1.0f;
     float R_kOhms = R_wood_ohms / 1000.0f;
@@ -65,7 +65,6 @@ inline float calculate_indicated_mc(float R_wood_ohms, const WoodSpecies& specie
 }
 
 // Bilinear interpolation over the temperature-correction grid.
-// Transcribed from src/main.cpp::bilinear_interpolation.
 inline float bilinear_interpolation(float x, float y,
                                     const float x_points[], int x_count,
                                     const float y_points[], int y_count,
@@ -92,7 +91,6 @@ inline float bilinear_interpolation(float x, float y,
 }
 
 // Temperature correction C_t (% MC) to add to the indicated MC.
-// Transcribed from src/main.cpp::get_temperature_correction.
 inline float get_temperature_correction(float indicated_mc, float wood_temp_celsius) {
     if (!ENABLE_TEMPERATURE_COMPENSATION) return 0.0f;
 

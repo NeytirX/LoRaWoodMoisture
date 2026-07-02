@@ -2,12 +2,14 @@
 // Off-target invariant tests for the pure MC math in include/wood_mc_math.h.
 // Run on the host: pio test -e native
 //
-// Scope (deliberate): only invariants that hold for ANY sane calibration data,
-// so the suite survives the M3 recalibration of wood_species_data.h and
-// wood_temp_correction_data.h (issues.md #9/#11). Golden-value tests pinning
-// the calibrated coefficients and the re-transcribed temperature table are
-// added at M3 (next_steps.md item 4). The one physics-direction test is
-// TEST_IGNOREd until the table re-transcription lands (issues.md #9).
+// Scope (deliberate): invariants that hold for ANY sane calibration data (so
+// the suite survives the M3 recalibration of wood_species_data.h and
+// wood_temp_correction_data.h, issues.md #9/#11), plus goldens pinning the
+// current tables - update those when the tables change. The physics-direction test
+// runs (enabled 2026-06-05, issues.md #9 resolved), golden cells pin the
+// digitized temperature table, and test_mc_real_species_golden pins the
+// Douglas-Fir/Oak/Beech coefficients; only Ash and Walnut remain unpinned
+// until the M3 own-data regression (issues.md #11).
 
 #include <unity.h>
 #include "wood_mc_math.h"
