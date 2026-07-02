@@ -3,21 +3,19 @@
 //
 // Why this header exists
 // ----------------------
-// The authoritative copies of calculate_indicated_mc(), get_temperature_correction()
-// and bilinear_interpolation() live in src/main.cpp. That file is the single
-// firmware translation unit and depends on Arduino, RadioLib, the PMIC, NVS, etc.,
-// none of which build for the `native` test platform. To unit-test the math
-// without hardware, the *pure* portion is mirrored here as free functions in the
-// `wood_mc` namespace.
+// This header is the single home of the pure moisture-content math —
+// calculate_indicated_mc(), get_temperature_correction() and
+// bilinear_interpolation() — as free functions in the `wood_mc` namespace.
+// src/main.cpp includes this header and calls wood_mc::* rather than carrying its
+// own copies, so the deployed firmware runs exactly the code the `native` test
+// suite exercises. (Until 2026-07-02 the math was duplicated in main.cpp and this
+// header was a hand-kept mirror of it; that duplication has been removed.)
 //
-// The functions read the same PROGMEM tables in include/wood_species_data.h and
-// include/wood_temp_correction_data.h (the single source of calibration truth),
-// so the tables themselves are never duplicated - only the arithmetic is. The
-// arithmetic here is a line-for-line transcription of main.cpp; if you change one,
-// change both. A future cleanup can collapse this duplication by having main.cpp
-// include this header and call wood_mc::* (it cannot today without editing
-// main.cpp). The namespace keeps these names from colliding with main.cpp's
-// global-scope copies, so this header is safe to include from any TU.
+// The functions read the PROGMEM tables in include/wood_species_data.h and
+// include/wood_temp_correction_data.h (the single source of calibration truth).
+// Being namespaced, stateless free functions, they are safe to include from any
+// translation unit — both main.cpp (Arduino/RadioLib/PMIC) and the native tests,
+// none of which the pure math depends on.
 //
 // Native build shims
 // ------------------
