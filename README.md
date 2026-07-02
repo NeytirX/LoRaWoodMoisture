@@ -14,8 +14,8 @@ This firmware is the consolidated version incorporating improvements from multip
 - **DS18B20 Temperature Sensor:** Optional 1-Wire temperature probe for direct wood temperature measurement; without a valid reading the MC correction uses a configured default temperature and the uplink is flagged
 - **LoRaWAN Connectivity:** EU868/EU433 (runtime-selectable via NVS, single firmware binary for both board types), OTAA, Cayenne LPP payload format for IoT integration
 - **Session Persistence:** LoRaWAN nonces saved to NVS and session saved to RTC memory across deep sleep cycles (avoids costly OTAA rejoin every wake)
-- **Remote Configuration:** Downlink commands for adjusting measurement interval, wood species, LoRaWAN region, TX power, and forcing rejoin
-- **Battery-Aware Power Management:** AXP192/AXP2101 PMIC integration (auto-detected, T-Beam v1.1/v1.2) with critical voltage protection and adaptive sleep intervals (2x/4x multiplier when battery is low/critical)
+- **Remote Configuration:** Downlink commands for adjusting measurement interval, wood species, LoRaWAN region, and forcing rejoin (a TX power command byte exists but is reserved — see Downlink Commands)
+- **Battery-Aware Power Management:** AXP192/AXP2101 PMIC integration (auto-detected, T-Beam v1.1/v1.2) with critical voltage protection and adaptive sleep intervals (2x/4x multiplier when battery is low/critical); both the critical-battery abort and the sleep multipliers are skipped while USB power is present, including when no battery is detected at all
 - **Hardware Watchdog:** ESP32 Task Watchdog Timer prevents firmware hangs (120s timeout)
 - **Ultra-Low Power Design:** Deep sleep operation with configurable intervals (default: 1 hour)
 
@@ -138,6 +138,7 @@ I2C (PMIC):
 | `LORAWAN_JOIN_MAX_RETRIES` | 5 | Max join attempts |
 | `CRITICAL_BATTERY_THRESHOLD_V` | 3.2 | Critical cutoff threshold (V) |
 | `LOW_BATTERY_THRESHOLD_V` | 3.4 | Extended sleep threshold (V) |
+| `BATTERY_ABSENT_THRESHOLD_V` | 0.5 | Below this + USB present = no battery connected |
 | `WATCHDOG_TIMEOUT_SECONDS` | 120 | Watchdog timer (seconds) |
 
 Each wake cycle sends exactly one uplink (single-TX-per-cycle design): the firmware performs a single `sendReceive()` with no retry loop. A failed uplink is intentionally dropped and the device sleeps until the next measurement; for an hourly cadence a missed reading is acceptable, and skipping retries saves the battery and air-time they would cost.
@@ -151,7 +152,7 @@ Send downlink messages on any port to reconfigure the device:
 | Set Interval | `0x01 HH LL` | Set measurement interval (HH:LL = minutes, big-endian uint16) |
 | Set Species | `0x02 XX` | Set wood species index (XX = 0 to NUM_WOOD_SPECIES-1) |
 | Force Rejoin | `0x03` | Force a fresh OTAA join on next wake |
-| Set TX Power | `0x04 XX` | Set TX power index |
+| Set TX Power | `0x04 XX` | Reserved — parsed but not applied; ADR manages TX power (issue: implement or keep reserved) |
 | Set Region | `0x05 XX` | Set LoRaWAN region (XX = 0: EU868, 1: EU433). Persisted in NVS, forces rejoin |
 
 ### Adding Wood Species
@@ -210,6 +211,10 @@ ESP32 Boot (reset / timer wake)
   (PMIC detect AXP192/AXP2101, enable LoRa power, disable GPS)
          |
          v
+  Phase 1b: Critical Battery Check
+  (read voltage, abort if critical -> extended sleep, unless USB present)
+         |
+         v
   Phase 2: Sensor Init
   (ADC config, DS18B20 detection)
          |
@@ -223,12 +228,9 @@ ESP32 Boot (reset / timer wake)
   (skip join)          (fresh join)
          \                /
           v              v
-  Phase 4: Battery Check
-  (read voltage, abort if critical -> extended sleep)
-         |
-         v
   Phase 5: Sensor Measurement
-  (resistance, temperature, MC calculation with species correction)
+  (resistance, temperature, MC calculation with species correction;
+   battery voltage re-read here for the payload)
          |
          v
   Phase 6: Build Payload
@@ -242,6 +244,8 @@ ESP32 Boot (reset / timer wake)
   Phase 8: Deep Sleep
   (timer wakeup configured, battery-aware interval)
 ```
+
+(Phase numbering keeps the historical gap after Phase 3 — there is no separate Phase 4.)
 
 ### Key Modules
 

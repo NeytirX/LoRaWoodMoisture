@@ -840,18 +840,19 @@ D. Firmware Configuration (species index, interval, etc.)
 | 38 | 100 | +0.9% | +1.9% |
 | 49 | 120 | +1.4% | +2.9% |
 
-### A.2 Species Coefficients Quick Reference
+### A.2 Species Quick Reference
 
-Fitted from FPL-GTR-6 (James 1988) Table 1 over 7-25% MC; see `include/wood_species_data.h` for provenance and caveats (80 F basis, North American stock, Beech placeholder).
+Five species. Coefficients (A, B) and full provenance/caveats (mixed FPL 80 F basis and VTT
+Central-Europe curves, dry-end reliability limits) live in `include/wood_species_data.h` —
+not duplicated here to avoid drift.
 
-| Species | A | B |
-|---------|---|---|
-| Douglas-Fir (Coast) | 1.7003 | -0.12007 |
-| Oak, White | 1.6691 | -0.11800 |
-| Oak, Northern Red | 1.7078 | -0.12209 |
-| Ash, Black | 1.6213 | -0.11454 |
-| Walnut, Black | 1.6676 | -0.11069 |
-| Beech (placeholder) | 1.6665 | -0.11633 |
+| Index | Species | Provenance |
+|-------|---------|------------|
+| 0 | Douglas-Fir (Coast) | FPL GTR-6 fit (James 1988) |
+| 1 | Oak (European) | VTT 2000 Central-Europe curve |
+| 2 | Ash, Black | FPL GTR-6 fit (James 1988) |
+| 3 | Walnut, Black | FPL GTR-6 fit (James 1988) |
+| 4 | Beech (European) | VTT 2000 Central-Europe curve |
 
 ### A.3 Python Functions
 

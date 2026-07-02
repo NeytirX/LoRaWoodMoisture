@@ -418,10 +418,10 @@ Implement in data analysis:
 
 ```python
 def quality_flag(mc, resistance, battery):
-    if battery < 3.2: return "BAD"       # Low battery
-    if resistance < 100: return "SUSPECT" # Possible short
-    if resistance > 200e6: return "BAD"   # Open circuit (MAX_VALID_RESISTANCE_OHMS)
-    if mc < 6 or mc > 30: return "SUSPECT"# Out of calibration range
+    if battery < 3.2: return "BAD"            # Low battery
+    if resistance < 1e3: return "SUSPECT"     # Below MIN_VALID_RESISTANCE_OHMS (possible short)
+    if resistance > 1.55e6: return "SUSPECT"  # Above MAX_VALID_RESISTANCE_OHMS (out of measurable range)
+    if mc < 6 or mc > 30: return "SUSPECT"    # Out of calibration range
     return "GOOD"
 ```
 

@@ -51,7 +51,7 @@ RadioLib uses a synchronous/blocking API. The entire cycle runs in `setup()`, th
 | Phase | Description | On Failure |
 |-------|-------------|------------|
 | 1. PMIC Setup | PMIC detect (AXP192/AXP2101), enable LoRa power, disable GPS | Continue without PMIC |
-| 1b. Critical Battery Check | Read voltage, abort before radio if critical | Extended sleep |
+| 1b. Critical Battery Check | Read voltage, abort before radio if critical (unless USB present, in which case the device continues on USB power) | Extended sleep |
 | 2. Sensor Init | ADC attenuation, DS18B20 detection | Continue (default-temp fallback, flagged in payload) |
 | 3. Radio Init + Join/Restore | SX1262 init, restore session, OTAA activate | Sleep and retry |
 | 5. Sensor Measurement | Resistance, temperature, MC calculation | Continue with available data |
@@ -76,7 +76,7 @@ The critical-battery read runs right after PMIC init (before the expensive radio
                         v
             Phase 1b: Critical Battery Check
                       |
-            [critical voltage?]----> Extended sleep
+            [critical voltage?]----> Extended sleep (unless USB present)
                       |
                       v
                Phase 2: Sensor Init
@@ -264,23 +264,23 @@ Where A and B are species-specific coefficients from FPL GTR-6 Table 1.
 ### 2.6 LoRaWAN Communication Module
 
 **Library:** RadioLib (pinned `^7.1.0`, resolves to 7.7.1 as of 2026-06-04)
-**Region:** Runtime-selectable (EU868 default, EU433 via NVS — single firmware binary for both board types)
+**Region:** Runtime-selected from NVS on every boot in `execute_phase_radio_and_join()`; compile-time default is the `LORAWAN_REGION_DEFAULT` tunable in `config.h` (0=EU868, shipped default; 1=EU433) — single firmware binary for both board types
 **Radio:** SX1262 (T-Beam v1.1/v1.2)
 **Payload Format:** Cayenne LPP
 
 **Region Detection (NVS-based):**
 ```cpp
-const LoRaWANBand_t* region = &EU868;  // default
+const LoRaWANBand_t* region = &EU868;  // LORAWAN_REGION_DEFAULT == 0
 {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
-    uint8_t regionVal = prefs.getUChar(NVS_KEY_REGION, 0);
+    uint8_t regionVal = prefs.getUChar(NVS_KEY_REGION, LORAWAN_REGION_DEFAULT);
     prefs.end();
     if (regionVal == 1) region = &EU433;
 }
 node = new LoRaWANNode(&radio, region);
 ```
-Region is stored in NVS (`lorawan` namespace, `region` key: 0=EU868, 1=EU433). Changeable via downlink command `0x05`. On first boot with no NVS value, defaults to EU868.
+Region is stored in NVS (`lorawan` namespace, `region` key: 0=EU868, 1=EU433). Changeable via downlink command `0x05`. On first boot with no NVS value, the read falls back to the compile-time `LORAWAN_REGION_DEFAULT` (shipped as EU868).
 
 **Radio Initialization:**
 ```cpp
@@ -315,7 +315,7 @@ int txResult = node.sendReceive(data, len, fPort, downBuf, &downLen);
 | 0x01 | Set Interval | 2 bytes (uint16 big-endian, minutes) | Adjusts `current_interval_seconds` |
 | 0x02 | Set Species | 1 byte (species index) | Changes `selected_species_index` |
 | 0x03 | Force Rejoin | None | Invalidates session, will rejoin on next boot |
-| 0x04 | Set TX Power | 1 byte (power index) | Reserved for ADR override |
+| 0x04 | Set TX Power | 1 byte (power index) | Reserved: parsed and logged, but not applied — ADR manages TX power |
 | 0x05 | Set Region | 1 byte (0=EU868, 1=EU433) | Persists to NVS, invalidates session, rejoin on next boot |
 
 ---
@@ -385,6 +385,8 @@ The sleep interval is dynamically adjusted based on battery voltage:
 | Low | < 3.4V | 2x |
 | Critical | < 3.2V | 4x |
 
+Both multipliers are skipped while USB power is present (`pmic_usb_present()`, covering both AXP192 and AXP2101) — on USB the device runs at the normal interval regardless of the reported battery voltage.
+
 ### 4.3 Sensor Power Control
 
 The moisture probe is powered only during measurement:
@@ -407,7 +409,7 @@ LDO3 (GPS power) is explicitly disabled during PMIC setup via `PMU->disableLDO3(
 
 | Condition | Action |
 |-----------|--------|
-| Battery < 3200 mV | Skip measurement, enter sleep immediately |
+| Battery < 3200 mV | Skip measurement, enter sleep immediately — unless USB present (continues on USB power) |
 | ADC saturated high (>= 4094) | Return 1e12 ohm (open circuit) |
 | ADC near zero (< 1) | Return 1e-3 ohm (short circuit) |
 | Resistance out of range | Print warning, continue with reading |
@@ -452,7 +454,7 @@ Debug macros (config.h):
 ========================================
  Wood Moisture Sensor (LoRaWAN/RadioLib)
 ========================================
-Firmware v<MAJOR.MINOR.PATCH>
+Firmware v1.2.0
 Wake reason: Timer
 Woke from deep sleep.
 Selected species [0]: Douglas-Fir (Coast)
@@ -463,10 +465,11 @@ PMIC: AXP2101 (T-Beam v1.2) initialized OK.
 [Phase] Sensor Init
 [Sensor] ADC attenuation set. Pin: 35
 [Sensor] DS18B20 found! Devices: 1, Resolution: 12 bits
+[Region] EU868
 [Phase] Radio Init
 [Radio] SX1262 initialized OK
-[Session] Nonces loaded from NVS (16 bytes)
-[Session] Session restored from RTC (228 bytes)
+[Session] Nonces loaded from NVS (16 bytes).
+[Session] Session restored from RTC RAM.
 [LoRaWAN] Activating OTAA...
 [LoRaWAN] Session restored from saved state!
 [Phase] Sensor Measurement
@@ -479,8 +482,8 @@ FINAL Corrected MC: 12.24 %
 [Phase] Build Payload
 [Phase] LoRaWAN Uplink
 [TX] Uplink successful!
-[Session] Session saved to RTC (228 bytes)
-[Session] Nonces saved to NVS (16 bytes)
+[Session] Session saved to RTC RAM.
+[Session] Nonces saved to NVS.
 [Sleep] Entering deep sleep for 3600 seconds
 Entering deep sleep...
 ```
@@ -540,9 +543,12 @@ Edit `config.h`:
 
 ### 9.4 Changing LoRaWAN Region
 
-1. In `src/main.cpp`, change the region object: replace `&EU433` with `&EU868`, `&US915`, etc.
-2. RadioLib has built-in region definitions — no build flags needed
-3. For sub-band selection (e.g., US915), use `node.selectSubband(1)` before join
+Two ways to change region, depending on whether you need it at first boot or in the field:
+
+1. **Compile-time default:** In `config.h`, set `LORAWAN_REGION_DEFAULT` (0=EU868, 1=EU433) before flashing. This is what a fresh device uses until it receives a Set Region downlink.
+2. **Runtime (remote):** Send downlink command `0x05` with the desired region byte. The value is bounds-checked, persisted to NVS, and forces a rejoin so the new region takes effect on the next boot.
+
+RadioLib has built-in region definitions for both EU868 and EU433 — no build flags needed either way. For sub-band selection on other regions (e.g., US915), use `node.selectSubband(1)` before join.
 
 ### 9.5 LoRaWAN Key Format
 
@@ -566,5 +572,5 @@ RadioLib uses different key formats than MCCI LMIC:
 ---
 
 **Document Version:** 2.0
-**Last Updated:** 2026-03-17
+**Last Updated:** 2026-07-02
 **Author:** Master Thesis Project, Wood Technologies

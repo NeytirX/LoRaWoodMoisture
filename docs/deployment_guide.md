@@ -6,7 +6,7 @@ This document provides comprehensive instructions for deploying the LoRaWAN Wood
 
 **Application:** Master Thesis in Wood Technologies - Field Deployment
 **System:** LoRaWAN-connected resistive moisture monitoring (TTGO T-Beam v1.1/v1.2)
-**Firmware Version:** 2.0.0
+**Firmware Version:** See `config.h` (`FIRMWARE_VERSION_MAJOR`/`_MINOR`/`_PATCH`) or the boot banner
 
 ---
 
@@ -286,6 +286,8 @@ Electrodes are buried deeper with cable routed through a slot.
    - Select "Cayenne LPP" from dropdown
    - Click "Add formatter"
 
+**Region reality check:** the firmware picks its LoRaWAN region at runtime from NVS, defaulting at compile time to `LORAWAN_REGION_DEFAULT` in `config.h` (shipped as EU868). Whatever frequency plan you register above (EU_433 in this walk-through) must match the region the device is actually running, or the join will never reach the gateway. A fresh device can only receive a Set Region downlink (`0x05`) *after* it has already joined once in its default region — so for first deployment, set `LORAWAN_REGION_DEFAULT` to match the board/gateway before flashing. To move a device to the other region later, send downlink `0x05` (persists to NVS, forces rejoin).
+
 **Alternative Networks:**
 - Helium (now Helium IoT)
 - ChirpStack (self-hosted)
@@ -329,15 +331,16 @@ Edit `include/config.h`:
 
 ```cpp
 // Available species (from wood_species_data.h):
-// 0: Douglas-Fir (Coast)
-// 1: Oak, White
-// 2: Oak, Northern Red
-// 3: Ash, Black
-// 4: Walnut, Black
-// 5: Beech (placeholder - not in FPL-GTR-6 Table 1)
+// 0: Douglas-Fir (Coast)  - FPL GTR-6 fit
+// 1: Oak (European)       - VTT 2000 Central-Europe curve
+// 2: Ash, Black           - FPL GTR-6 fit
+// 3: Walnut, Black        - FPL GTR-6 fit
+// 4: Beech (European)     - VTT 2000 Central-Europe curve
 
 #define SELECTED_WOOD_SPECIES_INDEX 0  // Change as needed
 ```
+
+See `include/wood_species_data.h` for full provenance notes and caveats (mixed FPL/VTT temperature basis, North-American vs. European stock, dry-end reliability limits).
 
 Species can also be changed remotely via LoRaWAN downlink (command `0x02` + 1 byte species index).
 
@@ -370,7 +373,7 @@ The interval can also be changed remotely via LoRaWAN downlink (command `0x01` +
 
 ### 5.3 Session Persistence
 
-The firmware v2.0.0 includes LoRaWAN session persistence via NVS (nonces) and RTC memory (session). This means:
+The firmware includes LoRaWAN session persistence via NVS (nonces) and RTC memory (session). This means:
 - After a successful OTAA join, the LoRaWAN nonces are saved to NVS and session state is saved to RTC memory
 - On subsequent wakes from deep sleep, the session is restored without re-joining
 - This saves airtime, battery, and reduces time-to-transmit
@@ -386,21 +389,29 @@ The firmware accepts the following downlink commands on any port:
 | Set Interval | 0x01 | 2 bytes (uint16 BE, minutes) | Change measurement/send interval |
 | Set Species | 0x02 | 1 byte (species index) | Change wood species |
 | Force Re-join | 0x03 | (none) | Invalidate session, force fresh OTAA join |
-| Set TX Power | 0x04 | 1 byte (power index) | Adjust LoRa transmit power |
+| Set TX Power | 0x04 | 1 byte (power index) | Reserved — parsed but not applied; ADR manages TX power |
+| Set Region | 0x05 | 1 byte (0=EU868, 1=EU433) | Set LoRaWAN region; persists to NVS and forces rejoin |
 
 ### 5.5 Optional Data Channels
 
-Edit `src/main.cpp` to uncomment the optional Cayenne LPP channels in the payload-building phase:
+Channel 4 (resistance) is already enabled by default, so flagged readings can be re-judged offline against the raw resistance. Channels 3 (indicated MC) and 6 (ESP32 internal temp) are commented out by default to conserve payload space — edit `src/main.cpp` to enable them for debugging:
 
 ```cpp
 // Uncomment to send debug data:
 if (last_mc_indicated >= 0)
     lpp.addAnalogInput(LPP_CHANNEL_INDICATED_MC, last_mc_indicated);
-if (last_R_kOhms >= 0)
-    lpp.addAnalogInput(LPP_CHANNEL_RESISTANCE, last_R_kOhms);
 if (last_esp_temp_c > -50)
     lpp.addTemperature(LPP_CHANNEL_ESP_TEMP, last_esp_temp_c);
 ```
+
+Channel 4 is already active in `src/main.cpp` (no uncommenting needed):
+
+```cpp
+if (last_R_kOhms >= 0)
+    lpp.addAnalogInput(LPP_CHANNEL_RESISTANCE, last_R_kOhms);
+```
+
+Channels 7 (temp-fallback flag) and 8 (ADC-nonlinear flag) are always sent regardless of these settings.
 
 **Note:** Additional channels increase payload size. LoRaWAN limits payload to 51 bytes (EU433, SF12).
 
@@ -414,7 +425,7 @@ if (last_esp_temp_c > -50)
 
 - [ ] Connect battery, verify power LED
 - [ ] Open serial monitor (115200 baud)
-- [ ] Verify boot message with firmware version (v2.0.0)
+- [ ] Verify boot message shows a firmware version (printed from `config.h`, e.g. v1.2.0)
 - [ ] Confirm PMIC initialization ("PMIC Ok.")
 - [ ] Verify LoRaWAN join success ("LoRaWAN join successful" or "Session restored" in serial output)
 - [ ] Check sensor reading output:
@@ -492,7 +503,7 @@ Probe Installation:
 
 Device Configuration:
   Device EUI: _______________
-  Firmware Version: 2.0.0
+  Firmware Version: _______________ (from boot banner)
   Species Index: _______________
   Send Interval: _______________
   Session Persistence: Enabled
@@ -537,7 +548,7 @@ Initial Readings:
 | 3.5-3.7V | Good | Normal operation |
 | 3.4-3.5V | Low | Firmware auto-doubles interval |
 | 3.2-3.4V | Critical | Firmware auto-quadruples interval |
-| < 3.2V | Shutdown | Device enters extended deep sleep |
+| < 3.2V | Shutdown | Device enters extended deep sleep (unless USB power is present, in which case it continues on USB) |
 
 **Replacement Procedure:**
 1. Note current battery voltage from server
@@ -568,7 +579,9 @@ The firmware supports remote configuration via LoRaWAN downlink commands:
 - Change measurement interval without site visit
 - Switch wood species if specimen changes
 - Force re-join if network issues arise
-- Adjust TX power for signal optimization
+- Change LoRaWAN region if a device needs to move between EU868/EU433 deployments
+
+TX power (downlink `0x04`) is reserved — it is parsed and logged but not applied; ADR manages TX power automatically.
 
 Schedule downlinks via your network server console (TTN: Applications -> Messaging -> Downlink).
 
@@ -599,6 +612,9 @@ Schedule downlinks via your network server console (TTN: Applications -> Messagi
 | 5 | Battery Voltage | V |
 | 6 | ESP32 Internal Temp | C |
 | 7 | Temp Fallback Flag (1 = corrected with default temp) | 0/1 |
+| 8 | ADC Nonlinear Flag (1 = reading past ADC linearity knee, low-confidence) | 0/1 |
+
+Channels 3 and 6 are commented out by default; 7 and 8 are always sent (see the README data-format section for the authoritative table).
 
 ### 8.3 Data Quality Checks
 
@@ -650,21 +666,22 @@ def validate_reading(mc, temp, battery, rssi):
 
 **Normal Boot Sequence (first join):**
 ```
-=== Wood Moisture Sensor v2.0.0 ===
+=== Wood Moisture Sensor v1.2.0 ===
 Wake reason: Timer
 Selected Wood Species: Douglas-Fir (Coast)
 --- Phase 1: PMIC Setup ---
 PMIC Ok.
+--- Phase 1b: Battery Check ---
+Battery: 3890 mV (3.89 V)
 --- Phase 2: Sensor Init ---
 DS18B20 found on GPIO 14
+[Region] EU868
 --- Phase 3: Radio Init ---
 SX1262 init OK
 Restoring LoRaWAN session...
 activateOTAA: NEW_SESSION (fresh join)
 LoRaWAN join successful!
 Saving nonces to NVS...
---- Phase 4: Battery Check ---
-Battery: 3890 mV (3.89 V)
 --- Phase 5: Sensor Measurement ---
 DS18B20 Temp: 22.3 C
 [Sensor] Node voltage (trimmed mean): 1034.60 mV
@@ -683,18 +700,21 @@ Sleeping for 3600 s.
 
 **Normal Boot Sequence (session restored):**
 ```
-=== Wood Moisture Sensor v2.0.0 ===
+=== Wood Moisture Sensor v1.2.0 ===
 Wake reason: Timer
 Selected Wood Species: Douglas-Fir (Coast)
 --- Phase 1: PMIC Setup ---
 PMIC Ok.
+--- Phase 1b: Battery Check ---
+Battery: 3890 mV (3.89 V)
 --- Phase 2: Sensor Init ---
 DS18B20 found on GPIO 14
+[Region] EU868
 --- Phase 3: Radio Init ---
 SX1262 init OK
 Restoring LoRaWAN session...
 activateOTAA: SESSION_RESTORED
---- Phase 4: Battery Check ---
+--- Phase 5: Sensor Measurement ---
 ...
 ```
 
@@ -705,7 +725,7 @@ activateOTAA: SESSION_RESTORED
 | "PMIC init failed" | No AXP192/AXP2101 responding | Check I2C connections |
 | "activateOTAA failed" | LoRaWAN join failed | Verify keys, check coverage |
 | "Invalid resistance reading" | ADC reading out of range | Check probe wiring |
-| "CRITICAL: Battery voltage too low" | Below 3.2V | Replace battery |
+| "CRITICAL: Battery voltage too low" | Below 3.2V | Replace battery (or connect USB, which lets the device continue) |
 | "sendReceive failed" | LoRaWAN TX error | Check antenna, coverage |
 | "DS18B20 not found" | Sensor not on bus | Check wiring (GPIO 14, 4.7k pull-up) |
 | "Session invalid, re-joining" | RTC/NVS session corrupted | Automatic recovery |
@@ -747,7 +767,7 @@ activateOTAA: SESSION_RESTORED
 
 ```
 Pre-Deployment:
-[ ] Firmware v2.0.0 uploaded and tested
+[ ] Firmware uploaded and tested (version per config.h / boot banner)
 [ ] LoRaWAN keys configured (MSB for EUIs and keys)
 [ ] Species selected
 [ ] DS18B20 wired and verified
