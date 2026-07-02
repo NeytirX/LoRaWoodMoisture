@@ -46,7 +46,7 @@ This document describes the firmware architecture of the LoRaWAN Wood Moisture M
 
 ### 1.2 Execution Phases (Sequential)
 
-RadioLib uses a synchronous/blocking API. The entire cycle runs in `setup()`, then the ESP32 enters deep sleep. On wake, the ESP32 restarts and `setup()` runs again. `loop()` is never reached.
+RadioLib uses a synchronous/blocking API. The entire cycle runs in `setup()`, then the ESP32 enters deep sleep. On wake, the ESP32 restarts and `setup()` runs again. `loop()` is never reached. Each phase below is an `execute_phase_*` helper called in order from `setup()`; the abort-capable phases (PMIC/battery, radio/join) enter deep sleep directly instead of returning, so a failed phase never falls through to the next.
 
 | Phase | Description | On Failure |
 |-------|-------------|------------|
@@ -219,7 +219,7 @@ RadioLib uses two internal buffers:
 ### 2.4 Moisture Measurement
 
 **Files:**
-- `src/main.cpp` — `calculate_indicated_mc()`
+- `include/wood_mc_math.h` — `calculate_indicated_mc()` (`wood_mc` namespace; called from `main.cpp` and exercised by the native tests)
 - `include/sensor.h` — `read_wood_resistance_ohms()`
 - `include/wood_species_data.h` — Species coefficients (PROGMEM)
 
@@ -248,7 +248,7 @@ Where A and B are species-specific coefficients from FPL GTR-6 Table 1.
 ### 2.5 Temperature Compensation Module
 
 **Files:**
-- `src/main.cpp` — `get_temperature_correction()`, `bilinear_interpolation()`
+- `include/wood_mc_math.h` — `get_temperature_correction()`, `bilinear_interpolation()` (`wood_mc` namespace; called from `main.cpp`)
 - `include/wood_temp_correction_data.h` — FPL-GTR-6 Figure 5 correction grid (Celsius, digitized 2026-06-05)
 
 **Algorithm:**
