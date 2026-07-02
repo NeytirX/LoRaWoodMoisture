@@ -7,9 +7,9 @@
 // wood_temp_correction_data.h, issues.md #9/#11), plus goldens pinning the
 // current tables - update those when the tables change. The physics-direction test
 // runs (enabled 2026-06-05, issues.md #9 resolved), golden cells pin the
-// digitized temperature table, and test_mc_real_species_golden pins the
-// Douglas-Fir/Oak/Beech coefficients; only Ash and Walnut remain unpinned
-// until the M3 own-data regression (issues.md #11).
+// digitized temperature table, and test_mc_real_species_golden pins all five
+// shipped species coefficients - Ash and Walnut only pin the CURRENT FPL
+// seed values and will be re-pinned at the M3 own-data regression (issues.md #11).
 
 #include <unity.h>
 #include "wood_mc_math.h"
@@ -65,6 +65,18 @@ static void test_mc_real_species_golden(void) {
     memcpy_P(&oak_eu, &species_data[1], sizeof(WoodSpecies));
     TEST_ASSERT_FLOAT_WITHIN(0.05f, 22.08f, wood_mc::calculate_indicated_mc(1.0e6f, oak_eu));
     TEST_ASSERT_FLOAT_WITHIN(0.05f, 17.00f, wood_mc::calculate_indicated_mc(1.0e7f, oak_eu));
+
+    // Index 2 = Ash, Black, FPL GTR-6 seed - golden pins CURRENT seed values, re-pin at M3 (issue #11).
+    WoodSpecies ash;
+    memcpy_P(&ash, &species_data[2], sizeof(WoodSpecies));
+    TEST_ASSERT_FLOAT_WITHIN(0.05f, 18.95f, wood_mc::calculate_indicated_mc(1.0e6f, ash));
+    TEST_ASSERT_FLOAT_WITHIN(0.05f, 14.56f, wood_mc::calculate_indicated_mc(1.0e7f, ash));
+
+    // Index 3 = Walnut, Black, FPL GTR-6 seed - golden pins CURRENT seed values, re-pin at M3 (issue #11).
+    WoodSpecies walnut;
+    memcpy_P(&walnut, &species_data[3], sizeof(WoodSpecies));
+    TEST_ASSERT_FLOAT_WITHIN(0.05f, 21.65f, wood_mc::calculate_indicated_mc(1.0e6f, walnut));
+    TEST_ASSERT_FLOAT_WITHIN(0.05f, 16.78f, wood_mc::calculate_indicated_mc(1.0e7f, walnut));
 
     // Index 4 = Beech (European), VTT 2000 Table 5 CE curve re-fit, A=1.6688 B=-0.10258.
     WoodSpecies beech_eu;
