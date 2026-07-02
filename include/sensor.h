@@ -7,8 +7,10 @@
 //   - DS18B20 temperature sensor (1-Wire), with fallback to a configured default
 //     temp (DEFAULT_WOOD_TEMP_CELSIUS, flagged in payload); ESP32 die temp is
 //     diagnostic-only
-//   - Resistive wood moisture probe (voltage divider + ADC)
-//   - ADC attenuation configuration
+//   - Resistive wood moisture probe (voltage divider), read via an ADS1115
+//     external I2C ADC (default, USE_EXTERNAL_ADC true) or the internal ESP32
+//     ADC (fallback, USE_EXTERNAL_ADC false)
+//   - ADC attenuation configuration (internal-ADC path only)
 //   - Resistance range validation
 
 #ifndef SENSOR_H
@@ -18,6 +20,11 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include "config.h"
+
+#if USE_EXTERNAL_ADC
+#include <Wire.h>
+#include <Adafruit_ADS1X15.h>
+#endif
 
 // ESP32 internal temperature sensor (undocumented but available)
 // Pins us to the current espressif32 platform - see the platform note in
@@ -35,6 +42,11 @@ static OneWire oneWire(ONEWIRE_PIN);
 static DallasTemperature ds18b20(&oneWire);
 static bool ds18b20_available = false;
 
+#if USE_EXTERNAL_ADC
+static Adafruit_ADS1115 ads;
+static bool ads_available = false;
+#endif
+
 // =============================================================================
 // Initialization
 // =============================================================================
@@ -44,11 +56,24 @@ static bool ds18b20_available = false;
  * Call once during setup().
  */
 inline void sensor_init() {
+#if USE_EXTERNAL_ADC
+    // --- ADS1115 external ADC ---
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN); // Idempotent on ESP32; the AXP PMIC may already have opened the bus.
+    ads.setGain(GAIN_ONE); // FS +/-4.096 V covers the 0-3.3 V divider node.
+    ads_available = ads.begin(ADS1115_I2C_ADDRESS, &Wire);
+    if (ads_available) {
+        Serial.print(F("[Sensor] ADS1115 found (external ADC, A0). Addr: 0x"));
+        Serial.println(ADS1115_I2C_ADDRESS, HEX);
+    } else {
+        Serial.println(F("[Sensor] ADS1115 NOT found! Moisture readings will be invalid (flagged open-circuit)."));
+    }
+#else
     // --- ADC Attenuation ---
     analogSetAttenuation(ADC_ATTENUATION);
     analogSetPinAttenuation(MOISTURE_PROBE_ADC_PIN, ADC_ATTENUATION);
     Serial.print(F("[Sensor] ADC attenuation set. Pin: "));
     Serial.println(MOISTURE_PROBE_ADC_PIN);
+#endif
 
     // --- DS18B20 Detection ---
     ds18b20.begin();
@@ -74,6 +99,15 @@ inline void sensor_init() {
 inline bool sensor_has_ds18b20() {
     return ds18b20_available;
 }
+
+#if USE_EXTERNAL_ADC
+/**
+ * Returns true if the ADS1115 external ADC was detected during init.
+ */
+inline bool sensor_has_ads1115() {
+    return ads_available;
+}
+#endif
 
 // =============================================================================
 // Temperature Reading
@@ -157,6 +191,76 @@ inline float read_wood_temperature(bool &is_fallback) {
  *
  * NOTE: The probe power pin must already be HIGH before calling this function.
  */
+#if USE_EXTERNAL_ADC
+inline float read_wood_resistance_ohms(bool &adc_nonlinear) {
+    adc_nonlinear = false;
+
+    if (!ads_available) {
+        adc_nonlinear = true;
+        Serial.println(F("[Sensor] ADS1115 not available — cannot read moisture divider (flagged open-circuit)"));
+        return 1.0e12f; // Effectively infinite resistance; never fall back to GPIO 35.
+    }
+
+    // Wait for the divider node to settle after the probe power pin goes HIGH.
+    delay(ADC_READ_STABILIZATION_MS);
+
+    // ADS1115 sampling. No raw-count open-circuit pregate here: the 16-bit
+    // converter has no linearity knee to dodge, and the near-V_top guard below
+    // already catches the open-circuit case.
+    float samples[ADC_SAMPLES_TO_AVERAGE];
+    for (int i = 0; i < ADC_SAMPLES_TO_AVERAGE; i++) {
+        int16_t raw = ads.readADC_SingleEnded(0);
+        if (raw < 0) raw = 0; // Single-ended noise can read slightly negative.
+        float mv = ads.computeVolts(raw) * 1000.0f;
+        if (mv < 0.0f) mv = 0.0f;
+        samples[i] = mv;
+        delay(5);
+    }
+
+    // Trimmed mean: drop the lowest and highest sample, average the rest. Keeps
+    // the noise reduction of oversampling while rejecting a single EMI/RFI spike
+    // (a documented artifact for this resistive probe).
+    float v_min = samples[0], v_max = samples[0], v_sum = 0.0f;
+    for (int i = 0; i < ADC_SAMPLES_TO_AVERAGE; i++) {
+        v_sum += samples[i];
+        if (samples[i] < v_min) v_min = samples[i];
+        if (samples[i] > v_max) v_max = samples[i];
+    }
+    float v_node_mv = (ADC_SAMPLES_TO_AVERAGE > 2)
+        ? (v_sum - v_min - v_max) / (ADC_SAMPLES_TO_AVERAGE - 2)
+        : v_sum / ADC_SAMPLES_TO_AVERAGE;
+
+    Serial.print(F("[Sensor] Node voltage (trimmed mean): "));
+    Serial.print(v_node_mv);
+    Serial.println(F(" mV"));
+
+    const float v_top_mv = VCC_PROBE_VOLTAGE * 1000.0f;
+
+    // Short circuit / extremely wet: node pulled near 0 V.
+    if (v_node_mv < ADC_SHORT_CIRCUIT_MV) {
+        Serial.println(F("[Sensor] Node near 0 V — short circuit / extremely wet"));
+        return 1.0e-3f; // Near-zero resistance
+    }
+    // Safety guard for the divider denominator, and the open-circuit case: the
+    // node cannot reach V_top with finite R_wood, so sitting at/near V_top
+    // means an open circuit.
+    if (v_node_mv >= (v_top_mv - 1.0f)) {
+        adc_nonlinear = true;
+        Serial.println(F("[Sensor] Node at V_top — treating as open circuit"));
+        return 1.0e12f;
+    }
+    // Past this limit the 100 kOhm divider itself is losing sensitivity as the
+    // node approaches V_top (not a converter nonlinearity - the ADS1115 has
+    // none). The returned R is still computed but flagged low-confidence.
+    if (v_node_mv > EXT_ADC_COMPRESSION_LIMIT_MV) {
+        adc_nonlinear = true;
+        Serial.println(F("[Sensor] Divider compressed near V_top — reading low-confidence (flagged)"));
+    }
+
+    float R_wood = R_PULLUP_OHMS * (v_node_mv / (v_top_mv - v_node_mv));
+    return R_wood;
+}
+#else
 inline float read_wood_resistance_ohms(bool &adc_nonlinear) {
     adc_nonlinear = false;
 
@@ -219,6 +323,7 @@ inline float read_wood_resistance_ohms(bool &adc_nonlinear) {
     float R_wood = R_PULLUP_OHMS * (v_node_mv / (v_top_mv - v_node_mv));
     return R_wood;
 }
+#endif
 
 /**
  * Check if the measured resistance is within the valid calibration range

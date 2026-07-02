@@ -64,7 +64,43 @@ This document provides comprehensive instructions for deploying the LoRaWAN Wood
 
 ### 2.1 Moisture Probe Wiring
 
-**Circuit Diagram:**
+**Canonical harness (ADS1115 external ADC, `USE_EXTERNAL_ADC` true - shipped default):**
+
+The divider node feeds the ADS1115's A0 input (single-ended) instead of an
+ESP32 ADC pin, and the ADS1115 shares the PMIC's I2C bus.
+
+```
+             GPIO 25 (probe power, HIGH only during measurement)
+                      |
+                 [R_pullup]
+                   100 kOhm
+                      |
+                      +--------> ADS1115 A0 (divider node)
+                      |
+                   Probe 1
+                      |
+                  [WOOD]
+                      |
+                   Probe 2
+                      |
+                     GND
+```
+
+**ADS1115 connections:**
+
+| ADS1115 | T-Beam |
+|---------|--------|
+| VDD | 3V3 (not 5V/VUSB - keeps A0 within input range) |
+| GND | GND |
+| SCL | GPIO 22 (shared with the PMIC) |
+| SDA | GPIO 21 (shared with the PMIC) |
+| ADDR | GND (I2C address 0x48; ADDR to 3V3 would be 0x49) |
+
+**Legacy internal-ADC harness (`USE_EXTERNAL_ADC` false):** the older harness -
+sense wire straight to the ESP32's internal ADC on GPIO 35 - remains supported
+behind the compile-time switch. Its circuit and wiring steps:
+
+**Circuit Diagram (legacy internal-ADC harness):**
 
 ```
              GPIO 25 (probe power, HIGH only during measurement)
@@ -84,11 +120,11 @@ This document provides comprehensive instructions for deploying the LoRaWAN Wood
 ```
 
 **Important Notes:**
-- The firmware drives GPIO 25 (`MOISTURE_PROBE_POWER_PIN`) HIGH only during the measurement window, so the probe sees no continuous DC bias (prevents electrode corrosion and wood polarization) and draws no current between cycles.
+- The firmware drives GPIO 25 (`MOISTURE_PROBE_POWER_PIN`) HIGH only during the measurement window, so the probe sees no continuous DC bias (prevents electrode corrosion and wood polarization) and draws no current between cycles. This holds for both harnesses - GPIO 25 is the divider top either way.
 - Do NOT wire the pull-up to 3.3V directly; the divider must hang off GPIO 25 or the readings will be valid but the probe stays permanently energized.
-- GPIO 35 is input-only (ADC1_CH7) - it cannot be repurposed as an output. GPIO 32 must stay free: it is the LoRa radio's BUSY line.
+- GPIO 35 is input-only (ADC1_CH7) and is only wired up when `USE_EXTERNAL_ADC` is false. GPIO 32 must stay free in both harnesses: it is the LoRa radio's BUSY line.
 
-**Wiring Steps:**
+**Wiring Steps (legacy internal-ADC harness):**
 
 1. **Cut probe wires** to desired length (recommend 1-2 m for flexibility)
 
@@ -428,6 +464,7 @@ Channels 7 (temp-fallback flag) and 8 (ADC-nonlinear flag) are always sent regar
 - [ ] Verify boot message shows a firmware version (printed from `config.h`, e.g. v1.2.0)
 - [ ] Confirm PMIC initialization ("PMIC Ok.")
 - [ ] Verify LoRaWAN join success ("LoRaWAN join successful" or "Session restored" in serial output)
+- [ ] Confirm sensor init shows "ADS1115 found (external ADC, A0). Addr: 0x48" (or the internal-ADC line if `USE_EXTERNAL_ADC` is false)
 - [ ] Check sensor reading output:
   ```
   Wood Resistance: XXXX kOhms
@@ -666,7 +703,7 @@ def validate_reading(mc, temp, battery, rssi):
 
 **Normal Boot Sequence (first join):**
 ```
-=== Wood Moisture Sensor v1.2.0 ===
+=== Wood Moisture Sensor v1.3.0 ===
 Wake reason: Timer
 Selected Wood Species: Douglas-Fir (Coast)
 --- Phase 1: PMIC Setup ---
@@ -674,6 +711,7 @@ PMIC Ok.
 --- Phase 1b: Battery Check ---
 Battery: 3890 mV (3.89 V)
 --- Phase 2: Sensor Init ---
+ADS1115 found (external ADC, A0). Addr: 0x48
 DS18B20 found on GPIO 14
 [Region] EU868
 --- Phase 3: Radio Init ---
@@ -700,7 +738,7 @@ Sleeping for 3600 s.
 
 **Normal Boot Sequence (session restored):**
 ```
-=== Wood Moisture Sensor v1.2.0 ===
+=== Wood Moisture Sensor v1.3.0 ===
 Wake reason: Timer
 Selected Wood Species: Douglas-Fir (Coast)
 --- Phase 1: PMIC Setup ---
@@ -708,6 +746,7 @@ PMIC Ok.
 --- Phase 1b: Battery Check ---
 Battery: 3890 mV (3.89 V)
 --- Phase 2: Sensor Init ---
+ADS1115 found (external ADC, A0). Addr: 0x48
 DS18B20 found on GPIO 14
 [Region] EU868
 --- Phase 3: Radio Init ---
@@ -725,6 +764,7 @@ activateOTAA: SESSION_RESTORED
 | "PMIC init failed" | No AXP192/AXP2101 responding | Check I2C connections |
 | "activateOTAA failed" | LoRaWAN join failed | Verify keys, check coverage |
 | "Invalid resistance reading" | ADC reading out of range | Check probe wiring |
+| "ADS1115 NOT found!" | External ADC not responding on I2C (readings return flagged open-circuit) | Check I2C wiring/ADDR strap (shared bus with the PMIC), verify address 0x48 |
 | "CRITICAL: Battery voltage too low" | Below 3.2V | Replace battery (or connect USB, which lets the device continue) |
 | "sendReceive failed" | LoRaWAN TX error | Check antenna, coverage |
 | "DS18B20 not found" | Sensor not on bus | Check wiring (GPIO 14, 4.7k pull-up) |

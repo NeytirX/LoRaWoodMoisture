@@ -8,7 +8,7 @@ This firmware is the consolidated version incorporating improvements from multip
 
 ### Key Features
 
-- **Resistive Moisture Measurement:** Two-electrode resistive probe method following FPL GTR-6 guidelines
+- **Resistive Moisture Measurement:** Two-electrode resistive probe method following FPL GTR-6 guidelines, read by a 16-bit ADS1115 external ADC by default (internal ESP32 ADC available as a compile-time fallback via `USE_EXTERNAL_ADC`)
 - **Species-Specific Calibration:** Supports multiple wood species with dedicated coefficients (A, B parameters)
 - **Temperature Compensation:** Implements the FPL-GTR-6 Figure 5 correction grid (Celsius, digitized from the original chart) via bilinear interpolation
 - **DS18B20 Temperature Sensor:** Optional 1-Wire temperature probe for direct wood temperature measurement; without a valid reading the MC correction uses a configured default temperature and the uplink is flagged
@@ -39,15 +39,21 @@ This system was developed as part of a Master's thesis in Wood Technologies, foc
 | AXP192 / AXP2101 PMIC | Integrated on T-Beam (auto-detected) | Power management and battery charging |
 | Resistive Moisture Probe | Two-electrode type | Wood moisture sensing |
 | 100k Pull-up Resistor | 1% tolerance recommended | Voltage divider reference |
+| ADS1115 | 16-bit I2C ADC | Moisture divider readout (default measurement path; see docs/deployment_guide.md §2.1) |
 | Li-ion/LiPo Battery | 3.7V, 18650 or similar | Power source |
 
 ### Pin Configuration
 
 ```
-Moisture Probe:
-  - ADC Input: GPIO 35 (input-only ADC1; GPIO 32 is the radio BUSY line!)
+Moisture Probe (ADS1115 external ADC, default path -- USE_EXTERNAL_ADC true):
+  - Divider node -> ADS1115 A0 (single-ended); ADS1115 shares the PMIC's
+    I2C bus (SDA GPIO 21, SCL GPIO 22)
+  - ADS1115 ADDR -> GND (I2C address 0x48)
   - Power Control: GPIO 25 (drives the divider, HIGH only during measurement)
-  - Pull-up Resistor: 100k from GPIO 25 to the ADC node
+  - Pull-up Resistor: 100k from GPIO 25 to the divider node
+  - Wiring reference: docs/deployment_guide.md §2.1
+  - GPIO 35 is only used when USE_EXTERNAL_ADC is false (legacy internal-ADC
+    path); GPIO 32 is the radio BUSY line -- never use it here!
 
 DS18B20 Temperature Sensor (optional):
   - Data: GPIO 14 (with 4.7k pull-up to 3.3V)
@@ -61,7 +67,7 @@ LoRa (SX1262, dedicated SPI bus):
   - DIO1: GPIO 33
   - BUSY: GPIO 32
 
-I2C (PMIC):
+I2C (PMIC + ADS1115 external ADC):
   - SDA: GPIO 21
   - SCL: GPIO 22
 ```
@@ -121,11 +127,14 @@ I2C (PMIC):
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `MOISTURE_PROBE_ADC_PIN` | 35 | ADC input pin |
+| `USE_EXTERNAL_ADC` | true | Selects the ADS1115 external ADC (default) vs. the legacy internal ESP32 ADC |
+| `MOISTURE_PROBE_ADC_PIN` | 35 | ADC input pin (internal path only, `USE_EXTERNAL_ADC` false) |
 | `MOISTURE_PROBE_POWER_PIN` | 25 | Power control pin |
 | `R_PULLUP_OHMS` | 100000.0f | Pull-up resistor value |
 | `ADC_SAMPLES_TO_AVERAGE` | 10 | Samples per reading |
-| `ADC_ATTENUATION` | ADC_11db | ADC range (0-3.3V) |
+| `ADC_ATTENUATION` | ADC_11db | ADC range (0-3.3V) (internal path only, `USE_EXTERNAL_ADC` false) |
+| `ADS1115_I2C_ADDRESS` | 0x48 | ADS1115 I2C address (ADDR -> GND); external path only |
+| `EXT_ADC_COMPRESSION_LIMIT_MV` | 3150 | External-path node-voltage limit past which the divider is losing sensitivity (compression, not a converter knee); drives the LPP channel-8 flag; provisional pending the M2 precision-resistor ladder |
 | `SELECTED_WOOD_SPECIES_INDEX` | 0 | Species table index |
 | `ENABLE_TEMPERATURE_COMPENSATION` | true | Enable temp correction |
 | `ONEWIRE_PIN` | 14 | DS18B20 data pin |

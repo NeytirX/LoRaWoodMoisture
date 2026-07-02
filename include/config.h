@@ -49,6 +49,29 @@
 #define ADC_READ_STABILIZATION_MS 100
 #define ADC_SAMPLES_TO_AVERAGE    10
 
+// External ADC selection: true = read the divider node via an ADS1115 (16-bit
+// I2C ADC), the canonical harness per deployment_guide.md section 2.1 - this
+// is the default. false = fall back to the internal ESP32 ADC on
+// MOISTURE_PROBE_ADC_PIN, for boards wired per the legacy harness in the same
+// section.
+#define USE_EXTERNAL_ADC true
+
+// --- ADS1115 external ADC (used when USE_EXTERNAL_ADC is true) ---
+#define ADS1115_I2C_ADDRESS 0x48  // ADDR pin -> GND. (ADDR -> 3V3 would be 0x49.)
+
+// I2C bus pins (ESP32 default). The AXP192/AXP2101 PMIC already shares this
+// bus at address 0x34 - no address clash with the ADS1115 at 0x48.
+#define I2C_SDA_PIN 21
+#define I2C_SCL_PIN 22
+
+// With the 16-bit ADS1115 there is no converter linearity knee to flag (unlike
+// the internal ESP32 ADC below). The low-confidence limit here is instead the
+// 100 kOhm divider itself losing sensitivity as the node approaches V_top
+// (3150 mV corresponds to R_wood ~2 MOhm at 3.3 V). Drives the same
+// adc_nonlinear flag (LPP channel 8). Provisional until the M2
+// precision-resistor ladder tunes it.
+#define EXT_ADC_COMPRESSION_LIMIT_MV 3150.0f
+
 #define R_PULLUP_OHMS      100000.0f  // Pull-up resistor value (Ohms). CRITICAL for accuracy.
 #define ADC_MAX_READING    4095.0f    // 12-bit ADC max (ESP32)
 #define VCC_PROBE_VOLTAGE  3.3f       // Divider top voltage (probe power pin HIGH).
@@ -58,6 +81,8 @@
 // nonlinear and the divider R is compressed (the "silent zone"): readings are
 // still returned but flagged low-confidence (LPP channel 8). ~2.45 V per the
 // front-end plan (docs/ai/2026-06-05-001-feat-measurement-front-end-plan.md).
+// Applies to the internal-ADC path only (USE_EXTERNAL_ADC false); see
+// EXT_ADC_COMPRESSION_LIMIT_MV above for the ADS1115 path.
 #define ADC_LINEARITY_LIMIT_MV 2450.0f
 
 // ADC Attenuation - ADC_11db gives full 0-3.3V range on ESP32

@@ -157,7 +157,7 @@ The critical-battery read runs right after PMIC init (before the expensive radio
 This header defines `static` driver objects at header scope, so it must be included from `src/main.cpp` only. A second includer produces duplicate-symbol or split-state bugs (see `technical_debt.md` > Code structure).
 
 **Initialization (`sensor_init()`):**
-1. Set ADC attenuation to ADC_11db (0-3.3V full range)
+1. External path (`USE_EXTERNAL_ADC` true, shipped default): probe the ADS1115 at `ADS1115_I2C_ADDRESS` (0x48) on the shared PMIC I2C bus (SDA GPIO 21, SCL GPIO 22). This is a loud-failure design, not a silent fallback: if the ADS1115 does not respond, GPIO 35 is never touched, and every subsequent resistance reading returns open-circuit with the `adc_nonlinear` flag (LPP ch 8) set. Internal path (`USE_EXTERNAL_ADC` false): set ADC attenuation to ADC_11db (0-3.3V full range) on `MOISTURE_PROBE_ADC_PIN` (GPIO 35).
 2. Detect DS18B20 on 1-Wire bus (GPIO 14)
 3. Configure DS18B20 resolution (12-bit = 0.0625C)
 
@@ -171,14 +171,14 @@ The ESP32 die temperature (`temprature_sens_read()`) is never used for the MC co
 - Probe power pin must already be HIGH (toggled by main code)
 - Waits for ADC stabilization delay
 - Open-circuit gate on the raw count (calibration-independent)
-- Samples node voltage via `analogReadMilliVolts()` (eFuse-calibrated); trimmed mean (drop min+max) over the samples to reject EMI spikes
-- Sets `adc_nonlinear` when the node is past the ADC linearity knee or saturated
-- Handles edge cases: ADC saturation (open circuit) and near-zero (short circuit)
+- Samples the divider node: external path (default) via the ADS1115's `computeVolts()` on single-ended A0; internal path (`USE_EXTERNAL_ADC` false) via `analogReadMilliVolts()` (eFuse-calibrated). Either way, a trimmed mean (drop min+max) over the samples rejects EMI spikes
+- Sets `adc_nonlinear` past `EXT_ADC_COMPRESSION_LIMIT_MV` on the external path (the divider losing sensitivity near V_top, not a converter knee - provisional) or past `ADC_LINEARITY_LIMIT_MV`/saturation on the internal path
+- Handles edge cases: ADC saturation (open circuit) and near-zero (short circuit); on the external path an ADS1115-not-found condition also returns open-circuit with the flag set (see 5.1)
 - Formula: `R_wood = R_pullup * V_node / (V_top - V_node)`
 
 **Validation:**
 - `is_resistance_in_valid_range()`: coarse sanity bounds (1 kOhm to ~1.55 MOhm), serial warning only
-- Trustworthy-measurement signal is the ADC linearity flag (`adc_nonlinear`, LPP ch 8), set on the node voltage (`ADC_LINEARITY_LIMIT_MV`), not on the resistance value
+- Trustworthy-measurement signal is the ADC linearity/compression flag (`adc_nonlinear`, LPP ch 8), set on the node voltage (`EXT_ADC_COMPRESSION_LIMIT_MV` on the external path, `ADC_LINEARITY_LIMIT_MV` on the internal path), not on the resistance value
 
 ---
 
@@ -413,6 +413,7 @@ LDO3 (GPS power) is explicitly disabled during PMIC setup via `PMU->disableLDO3(
 | ADC saturated high (>= 4094) | Return 1e12 ohm (open circuit) |
 | ADC near zero (< 1) | Return 1e-3 ohm (short circuit) |
 | Resistance out of range | Print warning, continue with reading |
+| ADS1115 not found (external path) | Return open-circuit reading, flag uplink (LPP channel 8) - no silent fallback to the internal ADC |
 | DS18B20 read error | Correct MC with `DEFAULT_WOOD_TEMP_CELSIUS`, flag uplink (LPP channel 7) |
 
 ### 5.2 LoRaWAN Errors
@@ -454,7 +455,7 @@ Debug macros (config.h):
 ========================================
  Wood Moisture Sensor (LoRaWAN/RadioLib)
 ========================================
-Firmware v1.2.0
+Firmware v1.3.0
 Wake reason: Timer
 Woke from deep sleep.
 Selected species [0]: Douglas-Fir (Coast)
@@ -463,7 +464,7 @@ Init PMIC (AXP192/AXP2101)...
 PMIC: AXP2101 (T-Beam v1.2) initialized OK.
 [Battery] Voltage: 3.89 V
 [Phase] Sensor Init
-[Sensor] ADC attenuation set. Pin: 35
+[Sensor] ADS1115 found (external ADC, A0). Addr: 0x48
 [Sensor] DS18B20 found! Devices: 1, Resolution: 12 bits
 [Region] EU868
 [Phase] Radio Init
