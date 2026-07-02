@@ -3,7 +3,7 @@
 // Target: Heltec WiFi LoRa 32 V3 (ESP32-S3 + SX1262), 433 MHz variant.
 //
 // Listens on the fixed P2P channel (see p2p_frame.h), decodes the framed
-// Cayenne LPP payload the T-Beam transmits in RADIO_P2P_MODE, and surfaces each
+// Cayenne LPP payload the T-Beam transmits in P2P_MODE, and surfaces each
 // reading two ways:
 //   - JSON line over USB serial (always; zero setup)
 //   - MQTT publish to a local broker (when WiFi creds are set in secrets.h)
@@ -60,6 +60,7 @@ float    dispTemp     = NAN;
 int      dispRssi     = 0;
 uint8_t  dispNode     = 0;
 bool     dispFallback = false;
+bool     dispAdcFlag  = false;
 uint32_t lastReadingMs = 0;
 
 WiFiClient   wifiClient;
@@ -121,6 +122,7 @@ static void display_reading() {
     String foot;
     if (!isnan(dispTemp)) foot += String(dispTemp, 1) + "C";
     if (dispFallback)     foot += " t?";
+    if (dispAdcFlag)      foot += " R!";  // low-confidence (ADC-compressed) resistance
     foot += "  " + String((millis() - lastReadingMs) / 1000) + "s ago";
     display.drawString(64, 52, foot);
 
@@ -145,6 +147,7 @@ static const char *channel_key(uint8_t channel) {
         case LPP_CHANNEL_BATTERY_VOLTAGE: return "battery_v";
         case LPP_CHANNEL_ESP_TEMP:        return "esp_temp_c";
         case LPP_CHANNEL_TEMP_FALLBACK:   return "temp_fallback";
+        case LPP_CHANNEL_ADC_NONLINEAR:   return "adc_nonlinear";
         default:                          return nullptr;
     }
 }
@@ -305,6 +308,7 @@ static void handle_packet() {
         dispMc        = doc["wood_mc"].as<float>();
         dispTemp      = doc["wood_temp_c"].isNull() ? NAN : doc["wood_temp_c"].as<float>();
         dispFallback  = !doc["temp_fallback"].isNull() && doc["temp_fallback"].as<int>() != 0;
+        dispAdcFlag   = !doc["adc_nonlinear"].isNull() && doc["adc_nonlinear"].as<int>() != 0;
         dispRssi      = (int)rssi;
         dispNode      = nodeId;
         lastReadingMs = millis();
