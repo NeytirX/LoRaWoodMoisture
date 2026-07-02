@@ -44,6 +44,7 @@ bool pmic_initialized = false;
 // =============================================================================
 void setup_axp();
 float pmic_batt_voltage();
+bool pmic_usb_present();
 void deep_sleep_with_timer(uint32_t seconds);
 void print_wakeup_reason();
 void process_downlink(uint8_t *data, uint8_t len);
@@ -225,7 +226,7 @@ void execute_phase_pmic_and_battery() {
     if (pmic_initialized) {
         last_battery_v = pmic_batt_voltage();
         DEBUG_PRINT(F("[Battery] Voltage: ")); DEBUG_PRINT(last_battery_v); DEBUG_PRINTLN(F(" V"));
-        bool usb_present = PMU2101 ? PMU2101->isVbusIn() : false;
+        bool usb_present = pmic_usb_present();
         if (last_battery_v < CRITICAL_BATTERY_THRESHOLD_V) {
             if (usb_present) {
                 if (last_battery_v < BATTERY_ABSENT_THRESHOLD_V) {
@@ -661,7 +662,7 @@ uint32_t calculate_sleep_interval() {
     uint32_t interval = current_interval_seconds;
 
     #ifdef USE_AXP_POWER_MANAGEMENT
-    bool usb_present = PMU2101 ? PMU2101->isVbusIn() : false;
+    bool usb_present = pmic_usb_present();
     if (!usb_present && last_battery_v > 0) {
         if (last_battery_v < CRITICAL_BATTERY_THRESHOLD_V) {
             interval *= CRITICAL_BATTERY_SLEEP_MULTIPLIER;
@@ -738,6 +739,15 @@ float pmic_batt_voltage() {
     if (PMU192)  return PMU192->getBattVoltage() / 1000.0f;
     if (PMU2101) return PMU2101->getBattVoltage() / 1000.0f;
     return -1.0f;
+}
+
+/**
+ * USB (VBUS) presence from whichever PMIC was detected (false if none).
+ */
+bool pmic_usb_present() {
+    if (PMU192)  return PMU192->isVbusIn();
+    if (PMU2101) return PMU2101->isVbusIn();
+    return false;
 }
 #endif
 
