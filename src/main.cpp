@@ -49,12 +49,13 @@ void print_wakeup_reason();
 void process_downlink(uint8_t *data, uint8_t len);
 uint32_t calculate_sleep_interval();
 
-// setup() phase steps (each runs once, in order). Every bool-returning phase that
-// hits an abort path enters deep sleep *itself* with the phase-appropriate duration
-// (so aborts keep the original per-phase sleep timing); the trailing `return false`
-// is therefore unreachable and setup()'s `if (!...) return;` is only defensive.
-bool execute_phase_pmic_and_battery();
-bool execute_phase_radio_and_join();
+// setup() phase steps (each runs once, in order). A phase that hits an abort path
+// enters deep sleep itself with the phase-appropriate duration; esp_deep_sleep_start
+// halts the CPU, so those phases never return and are void — setup() cannot and need
+// not continue past them. build_payload is the one real branch: it reports whether a
+// payload was produced, so setup() skips the uplink when it is empty.
+void execute_phase_pmic_and_battery();
+void execute_phase_radio_and_join();
 void execute_phase_measurement();
 bool execute_phase_build_payload();
 void execute_phase_uplink();
@@ -166,7 +167,7 @@ void setup() {
     name_buf[sizeof(name_buf) - 1] = '\0';
     DEBUG_PRINTLN(name_buf);
 
-    if (!execute_phase_pmic_and_battery()) return;
+    execute_phase_pmic_and_battery();
 
     // =====================================================================
     // PHASE 2: Sensor Init
@@ -174,7 +175,7 @@ void setup() {
     DEBUG_PRINTLN(F("[Phase] Sensor Init"));
     sensor_init();
 
-    if (!execute_phase_radio_and_join()) return;
+    execute_phase_radio_and_join();
 
     execute_phase_measurement();
 
@@ -202,9 +203,8 @@ void setup() {
 
 // PHASE 1 + 1b: PMIC init, then a critical-battery check that aborts (extended
 // sleep) before the power-hungry radio init when the cell is too low and USB is
-// absent. Returns false only on that abort (after entering deep sleep, so it is
-// effectively unreachable — see the forward-declaration note).
-bool execute_phase_pmic_and_battery() {
+// absent. The abort enters deep sleep and does not return (void).
+void execute_phase_pmic_and_battery() {
     // =====================================================================
     // PHASE 1: PMIC Setup
     // =====================================================================
@@ -237,19 +237,18 @@ bool execute_phase_pmic_and_battery() {
                 DEBUG_PRINTLN(F("[Battery] CRITICAL! Skipping measurement. Extended sleep."));
                 uint32_t sleep_s = current_interval_seconds * CRITICAL_BATTERY_SLEEP_MULTIPLIER;
                 deep_sleep_with_timer(sleep_s);
-                return false;
+                return;
             }
         }
     }
     #endif
-    return true;
 }
 
 // REGION DETECTION + PHASE 3: pick the band from NVS, construct the node, init the
 // radio, and join/restore the LoRaWAN session (or drive the TEMPORARY P2P bring-up
-// path). Aborts with a short retry sleep on radio-init/join failure, or an extended
-// sleep once max join retries are hit.
-bool execute_phase_radio_and_join() {
+// path). Aborts (short retry sleep on radio-init/join failure, extended sleep once
+// max join retries are hit) enter deep sleep and do not return (void).
+void execute_phase_radio_and_join() {
     // =====================================================================
     // REGION DETECTION: read from NVS, default EU868
     // =====================================================================
@@ -290,7 +289,7 @@ bool execute_phase_radio_and_join() {
         DEBUG_PRINT(F("[Radio] P2P init FAILED, code: "));
         DEBUG_PRINTLN(state);
         deep_sleep_with_timer(LORAWAN_JOIN_RETRY_SLEEP_SECONDS);
-        return false;
+        return;
     }
     DEBUG_PRINTLN(F("[Radio] SX1262 OK - *** TEMPORARY P2P MODE *** (no LoRaWAN)"));
 #else
@@ -302,7 +301,7 @@ bool execute_phase_radio_and_join() {
         DEBUG_PRINTLN(F("Check wiring: CS=18, DIO1=33, RST=23, BUSY=32"));
         // Sleep and retry on next wake
         deep_sleep_with_timer(LORAWAN_JOIN_RETRY_SLEEP_SECONDS);
-        return false; // won't reach here after deep_sleep_start
+        return; // won't reach here after deep_sleep_start
     }
     DEBUG_PRINTLN(F("[Radio] SX1262 initialized OK"));
 
@@ -359,11 +358,9 @@ bool execute_phase_radio_and_join() {
             DEBUG_PRINTLN(LORAWAN_JOIN_MAX_RETRIES);
             deep_sleep_with_timer(LORAWAN_JOIN_RETRY_SLEEP_SECONDS);
         }
-        return false;
+        return;
     }
 #endif // P2P_MODE (LoRaWAN join/restore is the #else deployment path)
-
-    return true;
 }
 
 // PHASE 5: power the probe, measure resistance / indicated MC / temperature, apply
