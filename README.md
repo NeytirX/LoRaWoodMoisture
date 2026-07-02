@@ -4,7 +4,7 @@
 
 This project implements a low-power, LoRaWAN-connected wood moisture monitoring system designed for long-term deployment in wood technology research and industrial applications. The system uses resistive probe technology based on the USDA Forest Products Laboratory (FPL) GTR-6 standard for accurate moisture content determination.
 
-This firmware is the consolidated version incorporating improvements from multiple development iterations, including LoRaWAN session persistence, DS18B20 temperature sensing, remote configuration via downlinks, and battery-aware power management.
+This firmware reads the resistive probe through a 100k voltage divider into a 16-bit ADS1115 external ADC, persists LoRaWAN sessions across deep sleep, exposes remote configuration via downlinks, and manages power based on battery state and USB presence. For interim use before an EU433 gateway is available, a companion P2P bench receiver (see Repository Companions) can pick up the sensor's frames directly.
 
 ### Key Features
 
@@ -98,7 +98,13 @@ I2C (PMIC + ADS1115 external ADC):
    pio run
    ```
 
+   Optionally run the host-side unit tests for the MC math (no hardware required):
+   ```bash
+   pio test -e native
+   ```
+
 3. **Configure LoRaWAN credentials:**
+   - Copy the template: `cp include/lorawan_keys_template.h include/lorawan_keys.h`
    - Open `include/lorawan_keys.h`
    - Enter your Join EUI and Device EUI as **MSB** `uint64_t` hex literals (e.g., `0x0000000000000000`)
    - Enter your Network Key and Application Key as **MSB** `uint8_t[16]` byte arrays
@@ -277,13 +283,14 @@ ESP32 Boot (reset / timer wake)
 | XPowersLib | ^0.1.9 | AXP192/AXP2101 PMIC control |
 | OneWire | ^2.3.8 | 1-Wire bus protocol |
 | DallasTemperature | ^3.11.0 | DS18B20 temperature sensor |
+| Adafruit ADS1X15 | ^2.5.0 | ADS1115 external ADC driver (moisture divider readout) |
 
-### Build Statistics
+### Build Statistics (as of firmware 1.3.0)
 
 | Resource | Usage |
 |----------|-------|
-| RAM | 2.0% (26,232 / 1,310,720 bytes) |
-| Flash | 32.4% (424,713 / 1,310,720 bytes) |
+| RAM | 1.9% (24,976 / 1,310,720 bytes) |
+| Flash | 33.6% (439,749 / 1,310,720 bytes) |
 
 ---
 
@@ -295,6 +302,14 @@ The following detailed documentation is available in the `docs/` directory:
 2. **[Calibration Procedure](docs/calibration_procedure.md)** - Probe calibration and verification methods
 3. **[Deployment Guide](docs/deployment_guide.md)** - Installation and field deployment instructions
 4. **[Data Interpretation](docs/data_interpretation.md)** - Understanding moisture readings, temperature correction, and analysis methods
+
+---
+
+## Repository Companions
+
+- **`receiver/`** - A standalone Heltec WiFi LoRa 32 V3 project that receives the sensor's frames over a raw private-LoRa link when no LoRaWAN gateway is available (bench/interim use). Decodes Cayenne LPP, prints JSON over serial, supports optional MQTT, and shows MC on its OLED. See `receiver/README.md`.
+- **`tools/p2p_tx_smoke/`** - A throwaway canned-frame transmitter for bring-up/testing of the receiver.
+- **`tbeam-p2p` build env** - TEMPORARY sensor-side counterpart to the P2P link, gated by `P2P_MODE`; removed once an EU433 gateway exists. The deployment data path remains LoRaWAN. Wire format shared via `receiver/include/p2p_frame.h`.
 
 ---
 ---
