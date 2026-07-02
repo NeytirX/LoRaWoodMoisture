@@ -2,7 +2,8 @@
 //
 // Every tunable parameter for the wood moisture sensor firmware:
 // pins, thresholds, intervals, LPP channels, and downlink command bytes.
-// Uses RadioLib (SX1262 + EU868).
+// Uses RadioLib (SX1262). The LoRaWAN region is runtime-selected from NVS
+// (see LORAWAN_REGION_DEFAULT).
 
 #ifndef CONFIG_H
 #define CONFIG_H
@@ -156,5 +157,11 @@
 #define NVS_NAMESPACE       "lorawan"
 #define NVS_KEY_NONCES      "nonces"
 #define NVS_KEY_REGION      "region"       // 0=EU868, 1=EU433 (persisted via downlink)
+
+// Region used when NVS holds no value (fresh device): 0=EU868, 1=EU433.
+// Runtime override is downlink 0x05, but a fresh device can only receive that
+// downlink after joining in this default region - pick the region matching the
+// board's RF matching/gateway before first flash.
+#define LORAWAN_REGION_DEFAULT 0
 
 #endif // CONFIG_H

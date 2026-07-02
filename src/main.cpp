@@ -1,7 +1,8 @@
 // src/main.cpp - Wood Moisture Sensor Firmware (LoRaWAN via RadioLib)
 //
 // Target: TTGO T-Beam v1.1/v1.2 (ESP32 + SX1262 + AXP192/AXP2101)
-// LoRaWAN: RadioLib with EU868 band, OTAA.
+// LoRaWAN: RadioLib, region runtime-selected from NVS (EU868/EU433; default
+// LORAWAN_REGION_DEFAULT in config.h), OTAA.
 //
 // Single-file firmware: the whole measure-send-sleep cycle runs once in
 // setup(), then the ESP32 deep-sleeps and restarts on timer wake. loop() is
@@ -68,7 +69,7 @@ void execute_phase_uplink();
 SX1262 radio = new Module(LORA_CS_PIN, LORA_DIO1_PIN, LORA_RST_PIN, LORA_BUSY_PIN);
 
 // LoRaWAN node bound to the radio — region selected at startup from NVS
-// (default EU868, changeable via downlink command 0x05)
+// (default LORAWAN_REGION_DEFAULT in config.h, changeable via downlink command 0x05)
 LoRaWANNode* node = nullptr;
 
 // Note: RadioLib v7.6.0 uses internal buffers accessed via getBufferNonces()/getBufferSession().
@@ -251,13 +252,13 @@ void execute_phase_pmic_and_battery() {
 // max join retries are hit) enter deep sleep and do not return (void).
 void execute_phase_radio_and_join() {
     // =====================================================================
-    // REGION DETECTION: read from NVS, default EU868
+    // REGION DETECTION: read from NVS, default LORAWAN_REGION_DEFAULT (config.h)
     // =====================================================================
     const LoRaWANBand_t* region = &EU868;
     {
         Preferences prefs;
         prefs.begin(NVS_NAMESPACE, true);
-        uint8_t regionVal = prefs.getUChar(NVS_KEY_REGION, 0);
+        uint8_t regionVal = prefs.getUChar(NVS_KEY_REGION, LORAWAN_REGION_DEFAULT);
         prefs.end();
         if (regionVal == 1) region = &EU433;
     }
