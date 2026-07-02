@@ -16,6 +16,7 @@
 #include "config.h"
 #include "wood_species_data.h"
 #include "wood_temp_correction_data.h"
+#include "wood_mc_math.h"            // pure MC math, shared with the native test suite
 #include "session_manager.h"
 #include "sensor.h"
 #include <CayenneLPP.h>
@@ -45,14 +46,18 @@ void setup_axp();
 float pmic_batt_voltage();
 void deep_sleep_with_timer(uint32_t seconds);
 void print_wakeup_reason();
-float calculate_indicated_mc(float R_wood_ohms, const WoodSpecies& species);
-float get_temperature_correction(float indicated_mc, float wood_temp_celsius);
-float bilinear_interpolation(float x, float y,
-                             const float x_points[], int x_count,
-                             const float y_points[], int y_count,
-                             const float table[][MC_POINTS_COUNT]);
 void process_downlink(uint8_t *data, uint8_t len);
 uint32_t calculate_sleep_interval();
+
+// setup() phase steps (each runs once, in order). Every bool-returning phase that
+// hits an abort path enters deep sleep *itself* with the phase-appropriate duration
+// (so aborts keep the original per-phase sleep timing); the trailing `return false`
+// is therefore unreachable and setup()'s `if (!...) return;` is only defensive.
+bool execute_phase_pmic_and_battery();
+bool execute_phase_radio_and_join();
+void execute_phase_measurement();
+bool execute_phase_build_payload();
+void execute_phase_uplink();
 
 // =============================================================================
 // RADIOLIB: SX1262 Radio + LoRaWAN Node
@@ -85,6 +90,10 @@ float last_wood_temp_c   = -100.0f;
 float last_mc_corrected  = -1.0f;
 float last_battery_v     = -1.0f;
 float last_esp_temp_c    = -100.0f;
+// Measurement quality flags: produced in the measurement phase and consumed when
+// building the payload (they cross the phase-function boundary via file scope).
+bool  last_adc_nonlinear      = false;
+bool  last_wood_temp_fallback = false;
 
 // =============================================================================
 // SETUP
@@ -157,6 +166,45 @@ void setup() {
     name_buf[sizeof(name_buf) - 1] = '\0';
     DEBUG_PRINTLN(name_buf);
 
+    if (!execute_phase_pmic_and_battery()) return;
+
+    // =====================================================================
+    // PHASE 2: Sensor Init
+    // =====================================================================
+    DEBUG_PRINTLN(F("[Phase] Sensor Init"));
+    sensor_init();
+
+    if (!execute_phase_radio_and_join()) return;
+
+    execute_phase_measurement();
+
+    if (execute_phase_build_payload()) {
+        execute_phase_uplink();
+    }
+
+    // =====================================================================
+    // PHASE 8: Deep Sleep
+    // =====================================================================
+    uint32_t sleep_seconds = calculate_sleep_interval();
+    DEBUG_PRINT(F("[Sleep] Entering deep sleep for "));
+    DEBUG_PRINT(sleep_seconds);
+    DEBUG_PRINTLN(F(" seconds"));
+    Serial.flush();
+
+    // Disable watchdog before sleep
+    esp_task_wdt_delete(NULL);
+    deep_sleep_with_timer(sleep_seconds);
+}
+
+// =============================================================================
+// SETUP PHASE STEPS (extracted from setup(); each runs exactly once, in order)
+// =============================================================================
+
+// PHASE 1 + 1b: PMIC init, then a critical-battery check that aborts (extended
+// sleep) before the power-hungry radio init when the cell is too low and USB is
+// absent. Returns false only on that abort (after entering deep sleep, so it is
+// effectively unreachable — see the forward-declaration note).
+bool execute_phase_pmic_and_battery() {
     // =====================================================================
     // PHASE 1: PMIC Setup
     // =====================================================================
@@ -189,18 +237,19 @@ void setup() {
                 DEBUG_PRINTLN(F("[Battery] CRITICAL! Skipping measurement. Extended sleep."));
                 uint32_t sleep_s = current_interval_seconds * CRITICAL_BATTERY_SLEEP_MULTIPLIER;
                 deep_sleep_with_timer(sleep_s);
-                return;
+                return false;
             }
         }
     }
     #endif
+    return true;
+}
 
-    // =====================================================================
-    // PHASE 2: Sensor Init
-    // =====================================================================
-    DEBUG_PRINTLN(F("[Phase] Sensor Init"));
-    sensor_init();
-
+// REGION DETECTION + PHASE 3: pick the band from NVS, construct the node, init the
+// radio, and join/restore the LoRaWAN session (or drive the TEMPORARY P2P bring-up
+// path). Aborts with a short retry sleep on radio-init/join failure, or an extended
+// sleep once max join retries are hit.
+bool execute_phase_radio_and_join() {
     // =====================================================================
     // REGION DETECTION: read from NVS, default EU868
     // =====================================================================
@@ -241,7 +290,7 @@ void setup() {
         DEBUG_PRINT(F("[Radio] P2P init FAILED, code: "));
         DEBUG_PRINTLN(state);
         deep_sleep_with_timer(LORAWAN_JOIN_RETRY_SLEEP_SECONDS);
-        return;
+        return false;
     }
     DEBUG_PRINTLN(F("[Radio] SX1262 OK - *** TEMPORARY P2P MODE *** (no LoRaWAN)"));
 #else
@@ -253,7 +302,7 @@ void setup() {
         DEBUG_PRINTLN(F("Check wiring: CS=18, DIO1=33, RST=23, BUSY=32"));
         // Sleep and retry on next wake
         deep_sleep_with_timer(LORAWAN_JOIN_RETRY_SLEEP_SECONDS);
-        return; // won't reach here after deep_sleep_start
+        return false; // won't reach here after deep_sleep_start
     }
     DEBUG_PRINTLN(F("[Radio] SX1262 initialized OK"));
 
@@ -310,10 +359,17 @@ void setup() {
             DEBUG_PRINTLN(LORAWAN_JOIN_MAX_RETRIES);
             deep_sleep_with_timer(LORAWAN_JOIN_RETRY_SLEEP_SECONDS);
         }
-        return;
+        return false;
     }
 #endif // P2P_MODE (LoRaWAN join/restore is the #else deployment path)
 
+    return true;
+}
+
+// PHASE 5: power the probe, measure resistance / indicated MC / temperature, apply
+// the temperature correction, and re-read the battery for the payload. Results land
+// in the file-scope last_* globals (including the two measurement quality flags).
+void execute_phase_measurement() {
     // =====================================================================
     // PHASE 5: Sensor Measurement
     // =====================================================================
@@ -326,6 +382,7 @@ void setup() {
     // --- Resistance Measurement ---
     bool adc_nonlinear = false;
     float R_ohms = read_wood_resistance_ohms(adc_nonlinear);
+    last_adc_nonlinear = adc_nonlinear;
     last_R_kOhms = R_ohms / 1000.0f;
     DEBUG_PRINT(F("Wood Resistance: "));
     DEBUG_PRINT(last_R_kOhms);
@@ -336,7 +393,7 @@ void setup() {
     // --- Indicated Moisture Content ---
     WoodSpecies current_species;
     memcpy_P(&current_species, &species_data[selected_species_index], sizeof(WoodSpecies));
-    last_mc_indicated = calculate_indicated_mc(R_ohms, current_species);
+    last_mc_indicated = wood_mc::calculate_indicated_mc(R_ohms, current_species);
     DEBUG_PRINT(F("Indicated MC: "));
     DEBUG_PRINT(last_mc_indicated);
     DEBUG_PRINTLN(F(" %"));
@@ -348,13 +405,14 @@ void setup() {
     // --- Temperature ---
     bool wood_temp_fallback = false;
     last_wood_temp_c = read_wood_temperature(wood_temp_fallback);
+    last_wood_temp_fallback = wood_temp_fallback;
     last_esp_temp_c = read_esp_temperature_celsius();
     DEBUG_PRINT(F("Wood Temp: ")); DEBUG_PRINT(last_wood_temp_c); DEBUG_PRINTLN(F(" C"));
     DEBUG_PRINT(F("ESP32 Temp: ")); DEBUG_PRINT(last_esp_temp_c); DEBUG_PRINTLN(F(" C"));
 
     // --- Temperature Correction ---
     #if ENABLE_TEMPERATURE_COMPENSATION == true
-        float temp_correction = get_temperature_correction(last_mc_indicated, last_wood_temp_c);
+        float temp_correction = wood_mc::get_temperature_correction(last_mc_indicated, last_wood_temp_c);
         DEBUG_PRINT(F("Temp Correction: ")); DEBUG_PRINT(temp_correction); DEBUG_PRINTLN(F(" % MC"));
         last_mc_corrected = constrain(last_mc_indicated + temp_correction, 0.0f, 100.0f);
     #else
@@ -373,7 +431,11 @@ void setup() {
 
     // Power down moisture probe
     digitalWrite(MOISTURE_PROBE_POWER_PIN, LOW);
+}
 
+// PHASE 6: build the Cayenne LPP payload from the measured last_* globals. Returns
+// false (skip TX) when nothing qualified and the payload is empty.
+bool execute_phase_build_payload() {
     // =====================================================================
     // PHASE 6: Build Payload
     // =====================================================================
@@ -383,17 +445,17 @@ void setup() {
         lpp.addAnalogInput(LPP_CHANNEL_WOOD_MC, last_mc_corrected);
     // Only send wood temp when actually measured - never report the
     // fallback default as a measurement
-    if (!wood_temp_fallback && last_wood_temp_c > -50 && last_wood_temp_c < 100)
+    if (!last_wood_temp_fallback && last_wood_temp_c > -50 && last_wood_temp_c < 100)
         lpp.addTemperature(LPP_CHANNEL_WOOD_TEMP, last_wood_temp_c);
     if (last_battery_v > 0)
         lpp.addAnalogInput(LPP_CHANNEL_BATTERY_VOLTAGE, last_battery_v);
     // Always sent: 1 = corrected MC used DEFAULT_WOOD_TEMP_CELSIUS, not a
     // measured temp - lets downstream analysis filter affected readings
-    lpp.addDigitalInput(LPP_CHANNEL_TEMP_FALLBACK, wood_temp_fallback ? 1 : 0);
+    lpp.addDigitalInput(LPP_CHANNEL_TEMP_FALLBACK, last_wood_temp_fallback ? 1 : 0);
     // Always sent: 1 = the ADC was past its linearity knee or saturated, so the
     // returned resistance is compressed (silent zone) and the MC is low-confidence.
     // Flagged on the ADC voltage, not the R value (see read_wood_resistance_ohms).
-    lpp.addDigitalInput(LPP_CHANNEL_ADC_NONLINEAR, adc_nonlinear ? 1 : 0);
+    lpp.addDigitalInput(LPP_CHANNEL_ADC_NONLINEAR, last_adc_nonlinear ? 1 : 0);
     // Raw resistance: paired with the quality flag so flagged readings can be
     // re-judged offline. Cheap (4 bytes) and the main lever for dry-end analysis.
     if (last_R_kOhms >= 0)
@@ -407,13 +469,14 @@ void setup() {
 
     if (lpp.getSize() == 0) {
         DEBUG_PRINTLN(F("No data to send. Skipping TX."));
-        // Skip to sleep
+        return false;
     }
+    return true;
+}
 
-    // =====================================================================
-    // PHASE 7: LoRaWAN Uplink (with downlink receive)
-    // =====================================================================
-    else {
+// PHASE 7: transmit — LoRaWAN uplink + downlink handling on the deployment path, or
+// a raw P2P frame on the TEMPORARY bench path.
+void execute_phase_uplink() {
 #ifdef P2P_MODE
         // === TEMPORARY P2P TRANSMIT - NOT LoRaWAN ============================
         // Wrap the freshly measured Cayenne LPP in the bench frame envelope and
@@ -491,20 +554,6 @@ void setup() {
         }
 #endif // P2P_MODE transmit branch
     }
-
-    // =====================================================================
-    // PHASE 8: Deep Sleep
-    // =====================================================================
-    uint32_t sleep_seconds = calculate_sleep_interval();
-    DEBUG_PRINT(F("[Sleep] Entering deep sleep for "));
-    DEBUG_PRINT(sleep_seconds);
-    DEBUG_PRINTLN(F(" seconds"));
-    Serial.flush();
-
-    // Disable watchdog before sleep
-    esp_task_wdt_delete(NULL);
-    deep_sleep_with_timer(sleep_seconds);
-}
 
 // =============================================================================
 // LOOP - Not used (everything runs in setup, then deep sleep)
@@ -634,64 +683,6 @@ uint32_t calculate_sleep_interval() {
     #endif
 
     return interval;
-}
-
-// =============================================================================
-// MOISTURE CONTENT CALCULATION
-// =============================================================================
-float calculate_indicated_mc(float R_wood_ohms, const WoodSpecies& species) {
-    if (R_wood_ohms <= 0) return -1.0f;
-    float R_kOhms = R_wood_ohms / 1000.0f;
-    if (R_kOhms <= 1e-3f) return 250.0f;
-    if (R_kOhms >= 1e9f)  return 5.0f;
-    float log10_R_kOhms = log10(R_kOhms);
-    return pow(10, species.A + (species.B * log10_R_kOhms));
-}
-
-// =============================================================================
-// TEMPERATURE CORRECTION (FPL-GTR-6 Figure 5, Celsius grid)
-// =============================================================================
-float get_temperature_correction(float indicated_mc, float wood_temp_celsius) {
-    if (!ENABLE_TEMPERATURE_COMPENSATION) return 0.0f;
-
-    // The correction grid is in Celsius (matches the DS18B20), no conversion.
-    float first_temp = pgm_read_float(&temp_points_c[0]);
-    float last_temp  = pgm_read_float(&temp_points_c[TEMP_POINTS_COUNT - 1]);
-    float first_mc   = pgm_read_float(&mc_points_indicated[0]);
-    float last_mc    = pgm_read_float(&mc_points_indicated[MC_POINTS_COUNT - 1]);
-
-    float wood_temp = constrain(wood_temp_celsius, first_temp, last_temp);
-    indicated_mc    = constrain(indicated_mc, first_mc, last_mc);
-
-    return bilinear_interpolation(wood_temp, indicated_mc,
-                                  temp_points_c, TEMP_POINTS_COUNT,
-                                  mc_points_indicated, MC_POINTS_COUNT,
-                                  correction_table);
-}
-
-float bilinear_interpolation(float x, float y,
-                             const float x_points[], int x_count,
-                             const float y_points[], int y_count,
-                             const float table[][MC_POINTS_COUNT]) {
-    int x_idx = 0;
-    while (x_idx < x_count - 2 && x > pgm_read_float(&x_points[x_idx + 1])) x_idx++;
-    int y_idx = 0;
-    while (y_idx < y_count - 2 && y > pgm_read_float(&y_points[y_idx + 1])) y_idx++;
-
-    float x1  = pgm_read_float(&x_points[x_idx]);
-    float x2  = pgm_read_float(&x_points[x_idx + 1]);
-    float y1  = pgm_read_float(&y_points[y_idx]);
-    float y2  = pgm_read_float(&y_points[y_idx + 1]);
-    float q11 = pgm_read_float(&table[x_idx][y_idx]);
-    float q12 = pgm_read_float(&table[x_idx][y_idx + 1]);
-    float q21 = pgm_read_float(&table[x_idx + 1][y_idx]);
-    float q22 = pgm_read_float(&table[x_idx + 1][y_idx + 1]);
-
-    if ((x2 - x1) == 0 || (y2 - y1) == 0) return q11;
-
-    float r1 = ((x2 - x) / (x2 - x1)) * q11 + ((x - x1) / (x2 - x1)) * q21;
-    float r2 = ((x2 - x) / (x2 - x1)) * q12 + ((x - x1) / (x2 - x1)) * q22;
-    return ((y2 - y) / (y2 - y1)) * r1 + ((y - y1) / (y2 - y1)) * r2;
 }
 
 // =============================================================================
