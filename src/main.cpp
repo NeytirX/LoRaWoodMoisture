@@ -456,9 +456,16 @@ bool execute_phase_build_payload() {
     // Flagged on the ADC voltage, not the R value (see read_wood_resistance_ohms).
     lpp.addDigitalInput(LPP_CHANNEL_ADC_NONLINEAR, last_adc_nonlinear ? 1 : 0);
     // Raw resistance: paired with the quality flag so flagged readings can be
-    // re-judged offline. Cheap (4 bytes) and the main lever for dry-end analysis.
-    if (last_R_kOhms >= 0)
-        lpp.addAnalogInput(LPP_CHANNEL_RESISTANCE, last_R_kOhms);
+    // re-judged offline, and the main lever for dry-end analysis. Encoded as a
+    // Generic Sensor (4-byte unsigned, integer kOhm) - NOT Analog Input, whose
+    // signed x100 int16 wraps above 327.67 kOhm and would corrupt the entire
+    // dry end (issue #20). Clamp first so the open-circuit sentinel ships as a
+    // bounded over-range marker instead of an absurd 1e9.
+    if (last_R_kOhms >= 0) {
+        float r_tx = (last_R_kOhms > LPP_RESISTANCE_MAX_KOHMS)
+                     ? LPP_RESISTANCE_MAX_KOHMS : last_R_kOhms;
+        lpp.addGenericSensor(LPP_CHANNEL_RESISTANCE, r_tx);
+    }
 
     // Optional debug channels (uncomment to include in payload)
     // if (last_mc_indicated >= 0)

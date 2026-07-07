@@ -455,9 +455,17 @@ if (last_esp_temp_c > -50)
 Channel 4 is already active in `src/main.cpp` (no uncommenting needed):
 
 ```cpp
-if (last_R_kOhms >= 0)
-    lpp.addAnalogInput(LPP_CHANNEL_RESISTANCE, last_R_kOhms);
+if (last_R_kOhms >= 0) {
+    float r_tx = (last_R_kOhms > LPP_RESISTANCE_MAX_KOHMS)
+                 ? LPP_RESISTANCE_MAX_KOHMS : last_R_kOhms;
+    lpp.addGenericSensor(LPP_CHANNEL_RESISTANCE, r_tx);  // 4-byte unsigned, integer kOhm
+}
 ```
+
+Resistance uses a Generic Sensor field, not Analog Input: the latter is a signed
+x100 int16 that wraps above 327.67 kOhm and would corrupt the entire dry end. The
+value is clamped to `LPP_RESISTANCE_MAX_KOHMS` so the open-circuit sentinel ships
+as a bounded over-range marker rather than an absurd number.
 
 Channels 7 (temp-fallback flag) and 8 (ADC-nonlinear flag) are always sent regardless of these settings.
 

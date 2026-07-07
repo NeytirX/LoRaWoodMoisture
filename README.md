@@ -198,7 +198,7 @@ The device transmits data using Cayenne Low Power Payload format:
 | 1 | Analog Input | Wood Moisture Content (%) | Float |
 | 2 | Temperature | Wood Temperature (C); omitted on temp fallback | Float |
 | 3 | Analog Input | Indicated MC (pre-correction) | Float |
-| 4 | Analog Input | Resistance (k) | Float |
+| 4 | Generic Sensor | Resistance (kOhm) | uint32 (integer kOhm) |
 | 5 | Analog Input | Battery Voltage (V) | Float |
 | 6 | Temperature | ESP32 Internal Temp (C) | Float |
 | 7 | Digital Input | Temp fallback flag | 0/1 |

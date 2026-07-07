@@ -137,6 +137,11 @@ static int16_t read_be16(const uint8_t *p) {
     return (int16_t)(((uint16_t)p[0] << 8) | p[1]);
 }
 
+static uint32_t read_be32(const uint8_t *p) {
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
+           ((uint32_t)p[2] << 8)  |  (uint32_t)p[3];
+}
+
 // Friendly JSON key for a known channel; falls back to "ch<N>" for the rest.
 static const char *channel_key(uint8_t channel) {
     switch (channel) {
@@ -181,6 +186,13 @@ static bool decode_lpp(const uint8_t *lpp, uint8_t len, JsonDocument &doc) {
                 float v = read_be16(&lpp[i]) / 100.0f;
                 if (known) doc[known] = v; else doc[fallback_key] = v;
                 i += 2;
+                break;
+            }
+            case LPP_TYPE_GENERIC_SENSOR: {
+                if (i + 4 > len) return false;
+                uint32_t v = read_be32(&lpp[i]);   // integer kOhm, no scaling
+                if (known) doc[known] = v; else doc[fallback_key] = v;
+                i += 4;
                 break;
             }
             case LPP_TYPE_TEMPERATURE: {

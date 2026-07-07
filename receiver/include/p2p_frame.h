@@ -46,7 +46,7 @@
 #define LPP_CHANNEL_WOOD_MC          1   // analog, % MC (corrected)
 #define LPP_CHANNEL_WOOD_TEMP        2   // temperature, C
 #define LPP_CHANNEL_INDICATED_MC     3   // analog, % MC (pre-correction)
-#define LPP_CHANNEL_RESISTANCE       4   // analog, kOhm
+#define LPP_CHANNEL_RESISTANCE       4   // generic sensor (4-byte unsigned), integer kOhm
 #define LPP_CHANNEL_BATTERY_VOLTAGE  5   // analog, V
 #define LPP_CHANNEL_ESP_TEMP         6   // temperature, C
 #define LPP_CHANNEL_TEMP_FALLBACK    7   // digital, 1 = default temp substituted
@@ -57,6 +57,7 @@
 // =============================================================================
 #define LPP_TYPE_DIGITAL_INPUT  0x00   // 1 byte, unsigned
 #define LPP_TYPE_ANALOG_INPUT   0x02   // 2 bytes, signed, scale 0.01
+#define LPP_TYPE_GENERIC_SENSOR 0x64   // 4 bytes, unsigned, scale 1 (resistance kOhm)
 #define LPP_TYPE_TEMPERATURE    0x67   // 2 bytes, signed, scale 0.1
 
 #endif // P2P_FRAME_H

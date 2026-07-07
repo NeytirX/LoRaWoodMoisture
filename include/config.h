@@ -101,6 +101,15 @@
 #define MIN_VALID_RESISTANCE_OHMS   1000.0f       // 1 kOhm (very wet / short)
 #define MAX_VALID_RESISTANCE_OHMS   1550000.0f    // ~1.55 MOhm (practical ADC clip)
 
+// Transmit ceiling for the resistance uplink (channel 4). The value is encoded
+// as a Cayenne LPP Generic Sensor (4-byte unsigned, integer kOhm), so it must
+// be clamped before encoding: the open-circuit sentinel (1e12 Ohm -> 1e9 kOhm)
+// is not a measurement and would otherwise ship as an absurd number. Any value
+// >= this ceiling means "at or above range" (pair it with the adc_nonlinear
+// flag on channel 8). 65535 kOhm (~65 MOhm) sits well above the ~2 MOhm dry-end
+// limit yet stays a clean, obviously-over-range marker.
+#define LPP_RESISTANCE_MAX_KOHMS    65535.0f
+
 // =============================================================================
 // TEMPERATURE SENSING
 // =============================================================================
@@ -160,7 +169,7 @@
 #define LPP_CHANNEL_WOOD_MC         1  // Wood Moisture Content (%)
 #define LPP_CHANNEL_WOOD_TEMP       2  // Wood Temperature (C)
 #define LPP_CHANNEL_INDICATED_MC    3  // Indicated MC (before temp correction)
-#define LPP_CHANNEL_RESISTANCE      4  // Wood Resistance (kOhms)
+#define LPP_CHANNEL_RESISTANCE      4  // Wood Resistance (kOhms), Generic Sensor: 4-byte unsigned, integer kOhm
 #define LPP_CHANNEL_BATTERY_VOLTAGE 5  // Battery Voltage (V)
 #define LPP_CHANNEL_ESP_TEMP        6  // ESP32 Internal Chip Temperature (C)
 #define LPP_CHANNEL_TEMP_FALLBACK   7  // Digital: 1 = no valid DS18B20 reading, MC corrected with DEFAULT_WOOD_TEMP_CELSIUS
