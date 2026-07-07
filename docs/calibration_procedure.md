@@ -39,17 +39,17 @@ Coefficients A and B vary by wood species due to differences in:
 - Cellular structure
 - Grain orientation
 
-**Coefficients (fitted from FPL-GTR-6 / James 1988 Table 1, 7-25% MC):**
+**Coefficients (the five shipped species; mixed FPL-GTR-6 and VTT provenance):**
 
-| Species | A | B | Valid Range (% MC) |
-|---------|---|---|-------------------|
-| Douglas-Fir (Coast) | 1.7003 | -0.12007 | 7-25 |
-| Oak, White | 1.6691 | -0.11800 | 7-25 |
-| Oak, Northern Red | 1.7078 | -0.12209 | 7-25 |
-| Ash, Black | 1.6213 | -0.11454 | 7-25 |
-| Walnut, Black | 1.6676 | -0.11069 | 7-25 |
+| Species | A | B | Source | Valid Range (% MC) |
+|---------|---|---|--------|-------------------|
+| Douglas-Fir (Coast) | 1.7003 | -0.12007 | FPL GTR-6 fit (James 1988) | 7-25 |
+| Oak (European) | 1.6852 | -0.11368 | VTT 2000 Central-Europe curve | 8-24 |
+| Ash, Black | 1.6213 | -0.11454 | FPL GTR-6 fit (James 1988) | 7-25 |
+| Walnut, Black | 1.6676 | -0.11069 | FPL GTR-6 fit (James 1988) | 7-25 |
+| Beech (European) | 1.6688 | -0.10258 | VTT 2000 Central-Europe curve | 8-24 |
 
-> **Note:** these are literature seeds, not this project's calibration. Table 1 is measured at 80 F (the correction grid is referenced to 70 F, a ~0.5% MC offset), the species are North American, and Beech is a placeholder (not in Table 1). The thesis coefficients come from the M3 regression (§6.2); see `include/wood_species_data.h` and `docs/ai/issues.md` #11.
+> **Note:** these are literature seeds, not this project's own calibration, and they mirror `include/wood_species_data.h` (the single source of truth). The FPL fits are from James 1988 Table 1, measured at 80 F while the correction grid is referenced to 70 F (a ~0.5% MC offset); Oak and Beech are converted from the VTT 2000 Central-Europe double-log curves (the 2026-06-15 refit, which dropped the earlier North-American Oak White / Oak Northern Red seeds and the Beech placeholder). The thesis coefficients come from the M3 regression (§6.2); see `include/wood_species_data.h` and `docs/ai/issues.md` #11.
 
 All species coefficients are stored in `include/wood_species_data.h`. The active species is selected at compile time via `SELECTED_WOOD_SPECIES_INDEX` in `include/config.h`, or at runtime via a LoRaWAN downlink command (`DOWNLINK_CMD_SET_SPECIES`, 0x02).
 
@@ -199,9 +199,9 @@ The firmware uses `ADC_11db` attenuation for full 0-3.3V range. Each measurement
 **Procedure:**
 
 1. **Equilibrate specimens** at different humidity levels:
-   - 33% RH (LiCl saturated solution) -> ~6% MC
+   - 33% RH (MgCl2 saturated solution) -> ~6% MC
    - 75% RH (NaCl saturated solution) -> ~14% MC
-   - 97% RH (K2SO4 saturated solution) -> ~20% MC
+   - 97% RH (K2SO4 saturated solution) -> ~25% MC
 
 2. **Wait for equilibrium** (2-4 weeks at constant temperature)
 
@@ -380,8 +380,12 @@ R^2 = _______________
 | Temperature measurement (DS18B20) | +/-0.3% MC |
 | Temperature measurement (ESP32 internal) | +/-1.0% MC |
 | Temperature correction table interpolation | +/-0.5% MC |
-| **Combined (RSS) with DS18B20** | **+/-1.3-2.3% MC** |
-| **Combined (RSS) with ESP32 internal only** | **+/-1.5-2.5% MC** |
+| **Combined (RSS) with DS18B20** | **+/-1.3-2.1% MC** |
+| **Combined (RSS) with ESP32 internal only** | **+/-1.6-2.4% MC** |
+
+RSS = sqrt(sum of squares) of the rows above; the range spans the +/-1% and
++/-2% species-coefficient bounds. Low/high: with DS18B20, 1.26-2.14; with the
+ESP32 internal sensor, 1.58-2.35 (rounded).
 
 ### 8.2 Reporting Uncertainty
 

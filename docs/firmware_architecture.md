@@ -225,15 +225,22 @@ RadioLib uses two internal buffers:
 
 **Measurement Principle:**
 
-The system uses a two-electrode resistive method based on the relationship:
+The system uses a two-electrode resistive method. The probe sits in the bottom
+leg of a divider (pull-up to V_top, node -> wood -> GND), so the node voltage
+inverts to resistance as:
 
 ```
-R_wood = R_pullup x (ADC_reading / (ADC_max - ADC_reading))
+R_wood = R_pullup x (V_node / (V_top - V_node))
 ```
 
 Where:
 - `R_pullup` = 100 kOhm (precision resistor)
-- `ADC_max` = 4095 (12-bit resolution)
+- `V_node`, `V_top` are millivolts, not raw counts — the read path works in
+  calibrated mV (ADS1115 `computeVolts()` on the external path, eFuse-calibrated
+  `analogReadMilliVolts()` on the internal path), so there is no `ADC_max` term.
+  This matches `sensor.h` and §2.3's formula above; the older raw-count form
+  (`ADC_reading / (ADC_max - ADC_reading)`) assumed full-scale = V_top and is
+  not how the firmware computes it.
 
 **Moisture Content Calculation (FPL GTR-6):**
 
@@ -326,8 +333,15 @@ int txResult = node.sendReceive(data, len, fPort, downBuf, &downLen);
 
 | Resource | Used | Available | % |
 |----------|------|-----------|---|
-| RAM | 26,232 bytes | 1,310,720 bytes | 2.0% |
-| Flash | 424,713 bytes | 1,310,720 bytes | 32.4% |
+| RAM | 24,976 bytes | 1,310,720 bytes | 1.9% |
+| Flash | 439,785 bytes | 1,310,720 bytes | 33.6% |
+
+> The "Available" column is what `pio run` reports for this board. Note that its
+> RAM total (1,310,720 B) is the app-partition size, not physical DRAM — the
+> board definition's `maximum_ram_size` equals the flash partition size, so the
+> percentage understates real DRAM utilization. Against the ESP32's ~320 KB DRAM
+> the ~25 KB of static RAM is closer to ~8%. Numbers are from the `ttgo-t-beam`
+> env at the current firmware version; they shift slightly build to build.
 
 ### 3.2 PROGMEM Usage
 

@@ -399,13 +399,23 @@ The interval can also be changed remotely via LoRaWAN downlink (command `0x01` +
 
 **Battery Life Estimates:**
 
+> Rough estimate only — no current draw has been bench-measured yet (tracked in
+> `docs/ai/next_steps.md`). The figures below are computed from a single model so
+> they are at least internally consistent: `life = C / (I_standby + Q_wake / T)`
+> with usable capacity **C = 2000 mAh**, effective standby current
+> **I_standby ~= 0.15 mA**, and per-wake charge **Q_wake ~= 1.2 mAh** (wake +
+> measure + one uplink). Note I_standby is the whole board's quiescent draw, which
+> dominates at long intervals and is far above the ESP32's own ~10-15 uA deep-sleep
+> spec (onboard PMIC, USB-serial, and LEDs on a stock T-Beam) — the single biggest
+> unknown until measured. A 3500-5000 mAh cell scales these ~1.75-2.5x.
+
 | Interval | Estimated Life (2000 mAh) |
 |----------|---------------------------|
-| 15 minutes | ~2 weeks |
+| 15 minutes | ~2-3 weeks |
 | 30 minutes | ~1 month |
 | 1 hour | ~2 months |
 | 4 hours | ~6 months |
-| 24 hours | ~1 year |
+| 24 hours | ~13-14 months |
 
 **Battery-Aware Sleep:** When battery drops below `LOW_BATTERY_THRESHOLD_V` (3.4V), the firmware automatically doubles the sleep interval. Below `CRITICAL_BATTERY_THRESHOLD_V` (3.2V), the interval is quadrupled to conserve remaining energy.
 

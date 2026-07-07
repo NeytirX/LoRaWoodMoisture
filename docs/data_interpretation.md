@@ -74,12 +74,18 @@ ADC Reading -> Resistance -> Indicated MC -> Temperature Correction -> Corrected
 
 ### 1.4 Expected Value Ranges
 
+Resistance ranges below are computed from the FPL GTR-6 formula for Douglas-Fir
+(A=1.7003, B=-0.12007), rounded; they are the *physical* resistance of the wood
+and are strongly species- and temperature-dependent. Note how steep the dry end
+is: every ~5% MC drop multiplies resistance by roughly 10x, so kiln-dry wood sits
+in the hundreds-of-MOhm-to-GOhm range.
+
 | Wood Condition | MC Range | Resistance Range |
 |----------------|----------|------------------|
-| Kiln-dried | 6-12% | 5-50 MOhm |
-| Air-dried (indoor) | 8-15% | 1-20 MOhm |
-| Air-dried (outdoor, covered) | 12-20% | 200 kOhm - 5 MOhm |
-| Green/fresh | 25-30%+ | < 100 kOhm |
+| Kiln-dried | 6-12% | ~150 MOhm - ~50 GOhm |
+| Air-dried (indoor) | 8-15% | ~20 MOhm - ~4 GOhm |
+| Air-dried (outdoor, covered) | 12-20% | ~2 MOhm - ~150 MOhm |
+| Green/fresh | 25-30%+ | ~70-330 kOhm |
 
 **Measurable envelope (this front-end):** the columns above are the *physical*
 resistance of wood; they are not all measurable by this device. With a 100 kOhm
@@ -831,14 +837,21 @@ D. Firmware Configuration (species index, interval, etc.)
 
 | Temp (C) | Temp (F) | Correction at 10% MC | Correction at 20% MC |
 |-----------|-----------|---------------------|---------------------|
-| -18 | 0 | -2.9% | -5.5% |
-| -7 | 20 | -2.0% | -4.0% |
-| 4 | 40 | -1.1% | -2.5% |
-| 16 | 60 | -0.4% | -0.9% |
+| -18 | 0 | +6.3% | +11.5% |
+| -7 | 20 | +3.9% | +6.8% |
+| 4 | 40 | +2.1% | +3.8% |
+| 16 | 60 | +0.6% | +1.0% |
 | 21 | 70 | 0.0% | 0.0% |
-| 27 | 80 | +0.4% | +0.9% |
-| 38 | 100 | +0.9% | +1.9% |
-| 49 | 120 | +1.4% | +2.9% |
+| 27 | 80 | -0.6% | -1.1% |
+| 38 | 100 | -1.6% | -2.8% |
+| 49 | 120 | -2.6% | -4.3% |
+
+Values are bilinear interpolations of the shipped `wood_temp_correction_data.h`
+grid (the same table §2.2 describes) and follow its sign convention: cold wood
+reads low, so C_t is **positive** below 21 C and is *added* to the indicated MC;
+warm wood reads high, so C_t is negative above 21 C. The +11.5% cell (-18 C,
+20% MC) lies in the deep-cold/high-MC corner the header flags as extrapolated
+beyond the GTR-6 chart, so treat it as indicative only.
 
 ### A.2 Species Quick Reference
 
@@ -864,8 +877,8 @@ def mc_from_resistance(r_kohms, A, B):
     return 10 ** (A + B * np.log10(r_kohms))
 
 def resistance_from_mc(mc, A, B):
-    """Calculate resistance from MC"""
-    return 10 ** ((mc - A) / B)
+    """Calculate resistance (kOhm) from MC - exact inverse of mc_from_resistance"""
+    return 10 ** ((np.log10(mc) - A) / B)
 
 def celsius_to_fahrenheit(c):
     return c * 9/5 + 32
