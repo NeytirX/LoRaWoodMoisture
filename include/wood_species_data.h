@@ -15,7 +15,7 @@
 //     VTT's own Table 6 worked example). Re-fitted to the single-log firmware
 //     form over 8..24 % MC by scripts/fit_vtt_european_coefficients.py
 //     (local-only): R2 >= 0.993, max residual ~1.3 % MC. These are European-
-//     stock curves, preferred over the American FPL seeds for Bella's samples.
+//     stock curves, preferred over the American FPL seeds for the project's samples.
 //     See docs/ai/2026-06-15-001-research-state-of-art-electrodes-models.md.
 //
 // CAVEATS (literature SEEDS / published curves, NOT this project's own M3 fit):
