@@ -308,9 +308,9 @@ Electrodes are buried deeper with cable routed through a slot.
 2. **Register Device:**
    - Select "Add end device"
    - Choose "Manually add"
-   - Select frequency plan: **EU_433**
+   - Select frequency plan: **EU_863_870_TTN**
    - Choose LoRaWAN version: **1.0.3**
-   - Regional Parameters: **RP001-1.0.3-RevB**
+   - Regional Parameters: **RP001-1.0.3-RevA**
 
 3. **Configure Device:**
    - Activation mode: **Over The Air Activation (OTAA)**
@@ -324,7 +324,7 @@ Electrodes are buried deeper with cable routed through a slot.
    - Select "Cayenne LPP" from dropdown
    - Click "Add formatter"
 
-**Region reality check:** the firmware picks its LoRaWAN region at runtime from NVS, defaulting at compile time to `LORAWAN_REGION_DEFAULT` in `config.h` (shipped as EU868). Whatever frequency plan you register above (EU_433 in this walk-through) must match the region the device is actually running, or the join will never reach the gateway. A fresh device can only receive a Set Region downlink (`0x05`) *after* it has already joined once in its default region — so for first deployment, set `LORAWAN_REGION_DEFAULT` to match the board/gateway before flashing. To move a device to the other region later, send downlink `0x05` (persists to NVS, forces rejoin).
+**Region reality check:** the firmware picks its LoRaWAN region at runtime from NVS, defaulting at compile time to `LORAWAN_REGION_DEFAULT` in `config.h` (shipped as EU868, which is the project's target band). Whatever frequency plan you register above must match the region the device is actually running, or the join will never reach the gateway. A fresh device can only receive a Set Region downlink (`0x05`) *after* it has already joined once in its default region, so for first deployment set `LORAWAN_REGION_DEFAULT` to match the board and gateway before flashing. To move a device to the other region later, send downlink `0x05` (persists to NVS, forces rejoin).
 
 **Alternative Networks:**
 - Helium (now Helium IoT)
