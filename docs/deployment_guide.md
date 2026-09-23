@@ -320,9 +320,10 @@ Electrodes are buried deeper with cable routed through a slot.
    - **IMPORTANT:** Keys (nwkKey, appKey) must be in **MSB** byte order as `uint8_t[16]` arrays
 
 4. **Set Payload Formatter:**
-   - Go to Integrations -> Payload Formatters
-   - Select "Cayenne LPP" from dropdown
-   - Click "Add formatter"
+   - Go to Payload formatters -> Uplink
+   - Select "Custom Javascript formatter" and paste `tools/ttn_uplink_formatter.js`
+   - Save changes
+   - Do not pick the built-in "Cayenne LPP" formatter: it has no Generic Sensor type, which channel 4 (resistance) uses, so it rejects the whole frame and no fields get decoded
 
 **Region reality check:** the firmware picks its LoRaWAN region at runtime from NVS, defaulting at compile time to `LORAWAN_REGION_DEFAULT` in `config.h` (shipped as EU868, which is the project's target band). Whatever frequency plan you register above must match the region the device is actually running, or the join will never reach the gateway. A fresh device can only receive a Set Region downlink (`0x05`) *after* it has already joined once in its default region, so for first deployment set `LORAWAN_REGION_DEFAULT` to match the board and gateway before flashing. To move a device to the other region later, send downlink `0x05` (persists to NVS, forces rejoin).
 
