@@ -107,7 +107,8 @@
 // is not a measurement and would otherwise ship as an absurd number. Any value
 // >= this ceiling means "at or above range" (pair it with the adc_nonlinear
 // flag on channel 8). 65535 kOhm (~65 MOhm) sits well above the ~2 MOhm dry-end
-// limit yet stays a clean, obviously-over-range marker.
+// limit yet stays a clean, obviously-over-range marker. TTN's built-in Cayenne
+// LPP formatter cannot decode Generic Sensor; use tools/ttn_uplink_formatter.js.
 #define LPP_RESISTANCE_MAX_KOHMS    65535.0f
 
 // =============================================================================
