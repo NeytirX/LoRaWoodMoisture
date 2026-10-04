@@ -1,27 +1,123 @@
-# Wiring: Wood Moisture Prototype (T-Beam + ADS1115)
+# Wiring: Wood Moisture Prototype (T-Beam v1.2 + ADS1115)
 
 Bench prototype wiring. Since firmware 1.3.0, this wiring **is** the firmware's
 default measurement path (`USE_EXTERNAL_ADC` true, shipped default) - see
 docs/firmware_architecture.md §2.2 for the sensor-layer behavior and
 docs/deployment_guide.md §2.1 for the field-deployment wiring pointer.
 
-- **Probe = two nails in the wood** (two-electrode resistive). Resistance between
-  the nails falls as moisture rises.
-- **ADS1115** (16-bit I2C ADC) reads the divider node. The ESP32 internal ADC
-  (GPIO 35) is unused in this build; the firmware only reads GPIO 35 when
-  `USE_EXTERNAL_ADC` is false (legacy internal-ADC path, see
-  docs/deployment_guide.md §2.1).
-- **DS18B20 not fitted yet.** Its pins are listed under "future" so the headers
-  can be pre-soldered now.
+- **Board: LilyGO T-Beam v1.2** (AXP2101 PMIC), 868 MHz version. The frequency
+  variant changes nothing here: same header, same wiring.
+- **Probe = two screws in the wood** (two-electrode resistive). Each screw is
+  contacted by a steel plate pressed onto its head. Resistance between the
+  screws falls as moisture rises.
+- **ADS1115** (16-bit I2C ADC) is stacked straight onto the T-Beam header and
+  reads the divider node on A0. The ESP32 internal ADC (GPIO 35) is unused.
+- **No DS18B20 in this build.** Its wiring, for later, is in
+  docs/deployment_guide.md §2.2.
+
+## Diagram
+
+![T-Beam v1.2 + ADS1115 solder map](soldering_prototype.svg)
+
+## Parts (per board)
+
+| Part | Note |
+|------|------|
+| T-Beam v1.2 | no OLED fitted on the right header (see step 1) |
+| ADS1115 module | pin order VDD, GND, SCL, SDA, ADDR, ALRT, A0, A1, A2, A3 |
+| 4-pin straight male header | cut from a strip |
+| 100 kΩ resistor, 1 % | measured before fitting (see step 2) |
+| thin insulated wire | ADDR jumper, GPIO 25 wire, probe leads A and B |
+| heat shrink | for the lead A joint |
+
+## Header pin positions (T-Beam v1.2)
+
+Positions count from the WiFi-antenna end (top). Taken from LilyGO's v1.2
+schematic (`LilyGo_TBeam_V1.2-lastest.pdf`, sheet 4, headers U12 and U14).
+
+**Right header**
+
+| Pos | Net | In this build |
+|-----|-----|---------------|
+| 1-5 | TX, RX, 23, 4, 0 | - |
+| 6 | GND | - |
+| 7 | 3V3 | header pin, ADS VDD |
+| 8 | GND | header pin, ADS GND |
+| 9 | GPIO 22 (SCL) | header pin, ADS SCL |
+| 10 | GPIO 21 (SDA) | header pin, ADS SDA |
+| 11 | 3V3 | **no pin** (ADS ADDR sits above it) |
+| 12 | LoRa IO (radio) | **no pin** (ADS ALRT sits above it) |
+| 13 | LoRa IO (radio) | **no pin** (ADS A0 sits above it) |
+
+**Left header** (only the two holes used)
+
+| Pos | Net | In this build |
+|-----|-----|---------------|
+| 8 | GPIO 25 | wire from the 100 kΩ |
+| 12 | GND | probe lead B |
+
+Positions 11-13 are why only four pins go in: 11 is 3V3 (`VCC_2_5V`, tied to
++3V3 by a 0 Ω link), and 12/13 are the radio's DIO lines (GPIO 32/33 through
+22 Ω). A pin there would tie ADDR to 3V3 and A0/ALRT to the radio.
+
+## Steps
+
+1. **Check for an OLED.** If LilyGO's OLED is already soldered on right
+   positions 7-10, stop: it uses the same four pins.
+2. **Measure the resistor** and write the value on the board. Use it if it
+   reads 99-101 kΩ. An exact 100.0 kΩ part is not needed (see Notes).
+3. **Header pins.** Put the 4-pin strip into right positions 7-10 (3V3, GND,
+   22, 21), short ends down, plastic spacer on the top side. Solder from the
+   underside. Leave 11-13 empty.
+4. **Stack the ADS1115** onto the long ends: VDD on 7 (3V3), GND on 8, SCL on
+   9 (22), SDA on 10 (21). The body hangs off the T-Beam's right edge. Check
+   VDD and SDA positions before soldering. The pin order decides, not which way
+   the labels read: on the Adafruit board this is chip side up. Solder the four
+   joints on top.
+   If the ADS1115 came with a 10-pin header already soldered on, cut the
+   ADDR, ALRT, A0 and A1-A3 pins off flush on the underside first.
+5. **ADDR jumper.** Short wire on top of the ADS1115 from ADDR to GND. Trim
+   flush underneath: 3V3 (position 11) is directly below.
+6. **Resistor.** One leg into the ADS1115 A0 hole from the top, soldered and
+   trimmed flush underneath (a radio line is directly below). The other leg
+   goes through an insulated wire to the T-Beam **left** hole GPIO 25
+   (position 8).
+7. **Probe lead A** soldered to the resistor's A0 leg just above the pad,
+   heat shrink over the joint.
+8. **Probe lead B** to the T-Beam **left** hole GND (position 12).
+9. **Leads to the plates**, one per screw. Which screw gets A or B does not
+   matter.
+
+Repeat for the second board.
+
+## Checks (power off, multimeter)
+
+| Between | Expect |
+|---------|--------|
+| right 3V3 (7) and GND (8) | not a short (a reading climbing from low is the capacitors charging, fine) |
+| ADS ADDR and ADS GND | ~0 Ω |
+| left GPIO 25 (8) and ADS A0 | the value written on the board, ~100 kΩ |
+| ADS A0 and T-Beam right position 13 | open, no connection |
+| lead A and lead B, screws not in wood | open, > 10 MΩ |
+| each lead end and its screw head, plate mounted | < 1 Ω |
+
+Then power up with serial at 115200. The sensor init line should read:
+
+```
+[Sensor] ADS1115 found (external ADC, A0). Addr: 0x48
+```
+
+`ADS1115 NOT found!` means check the ADDR jumper first (0x49 if it touches
+3V3), then SDA/SCL.
 
 ## Divider
 
 ```
   GPIO 25 ──100kΩ(1%)──┬── ADS1115 A0   (ADC reads this node)
  (drive HIGH only       │
-  during a measurement) nail #1
+  during a measurement) screw A + plate
                         (wood)
-                        nail #2
+                        screw B + plate
                          │
                         GND
 
@@ -30,59 +126,41 @@ docs/deployment_guide.md §2.1 for the field-deployment wiring pointer.
   wet wood  -> low  R -> A0 near 0 V
 ```
 
-## T-Beam pins to header now (future-proofed)
-
-Solder header pins on these while the iron is out:
-
-| Pin | Use |
-|-----|-----|
-| 3V3 | ADS VDD (+ future DS18B20 VDD and its pull-up) |
-| GND | ADS GND + ADDR, nail #2 (+ future DS18B20 GND) |
-| GPIO 21 | I2C SDA |
-| GPIO 22 | I2C SCL |
-| GPIO 25 | probe drive / 100k |
-| GPIO 14 | future DS18B20 data |
-
-Leave **GPIO 35** free. **Never** use **GPIO 32** (radio BUSY).
-
 ## Connections
 
 **ADS1115 -> T-Beam**
 
 | ADS1115 | T-Beam |
 |---------|--------|
-| VDD | 3V3 |
-| GND | GND |
-| SCL | GPIO 22 |
-| SDA | GPIO 21 |
-| ADDR | GND  (I2C address 0x48) |
+| VDD | 3V3, right position 7 (header pin) |
+| GND | GND, right position 8 (header pin) |
+| SCL | GPIO 22, right position 9 (header pin) |
+| SDA | GPIO 21, right position 10 (header pin) |
+| ADDR | ADS GND pad, jumper wire (I2C address 0x48) |
 
 **Divider / probe**
 
 | from | to |
 |------|----|
-| 100 kΩ leg | GPIO 25 |
-| 100 kΩ other leg | ADS1115 A0 |
-| nail #1 | ADS1115 A0 (same node as the 100k) |
-| nail #2 | GND |
-
-**Future DS18B20 (not wired now)**
-
-| from | to |
-|------|----|
-| VDD | 3V3 |
-| GND | GND |
-| data | GPIO 14 |
-| 4.7 kΩ | between GPIO 14 and 3V3 |
+| 100 kΩ leg | ADS1115 A0 |
+| 100 kΩ other leg | GPIO 25, left position 8 (wire) |
+| probe lead A (screw A) | ADS1115 A0 (same node as the 100k) |
+| probe lead B (screw B) | GND, left position 12 |
 
 ## Notes
 
-- **ADDR -> GND = 0x48** (firmware default). Do NOT tie ADDR to the neighbouring
-  3V3 pin (that would be 0x49).
-- 3V3 and GND each appear on **multiple** T-Beam pins. Header more than one, or
-  hardwire a branchable lead, to feed several things from one rail.
-- Nails are steel and do not solder easily: wrap stripped wire tightly around the
-  head, or use an alligator clip / ring terminal. Solid mechanical contact is
-  what matters for a resistance reading.
+- **ADDR -> GND = 0x48** (firmware default). ADDR to 3V3 would be 0x49 and the
+  firmware would not find the ADC.
+- **Resistor tolerance barely matters.** The firmware assumes exactly
+  100000 Ω (`R_PULLUP_OHMS` in `include/config.h`). On the Douglas-fir curve
+  in `include/wood_species_data.h`, a resistor 1 % off shifts the reading by
+  about 0.03 MC points, 5 % off by about 0.15. A standard 1 % part is fine;
+  record its measured value anyway.
+- **Screw contacts.** A loose or rusted plate adds resistance in series with
+  the wood and reads as drier wood, or as an open circuit. Use the same steel
+  for screws and plates to avoid galvanic corrosion, and keep the plates
+  pressed firmly.
+- **GPIO 35 and GPIO 32 stay free.** On v1.2, GPIO 35 is the AXP2101 interrupt
+  (per LilyGO's pin map) and GPIO 32 is the radio BUSY line.
 - ADS1115 used **single-ended on A0** (node to GND).
 - Power the ADS1115 from 3V3, not 5V/VUSB, to keep A0 within input range.

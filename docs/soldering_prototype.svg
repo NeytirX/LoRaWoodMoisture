@@ -1,0 +1,200 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1430" width="1100" height="1430" role="img" aria-labelledby="t d" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title id="t">T-Beam v1.2 + ADS1115 solder map</title>
+  <desc id="d">Top view of a LilyGO T-Beam v1.2 with an ADS1115 stacked on right-header positions 7 to 10, the 100 kOhm divider to GPIO 25, the probe leads, a side view of the stack and the divider circuit.</desc>
+  <rect width="1100" height="1430" fill="#191724" />
+  <text x="40" y="44" fill="#e0def4" font-size="24" font-weight="700">T-Beam v1.2 + ADS1115 · solder map</text>
+  <text fill="#908caa" font-size="14px" x="40" y="70">Top view, parts side up, WiFi end at the top. Not to scale. One board shown: build both the same.</text>
+  <g>
+    <line fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" x1="40" y1="100" x2="64" y2="100" stroke="#eb6f92" />
+    <text font-size="13" fill="#908caa" x="70" y="104">3V3</text>
+    <line fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" x1="112" y1="100" x2="136" y2="100" stroke="#908caa" />
+    <text font-size="13" fill="#908caa" x="142" y="104">GND</text>
+    <line fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" x1="186" y1="100" x2="210" y2="100" stroke="#f6c177" />
+    <text font-size="13" fill="#908caa" x="216" y="104">SCL 22</text>
+    <line fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" x1="276" y1="100" x2="300" y2="100" stroke="#9ccfd8" />
+    <text font-size="13" fill="#908caa" x="306" y="104">SDA 21</text>
+    <line fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" x1="366" y1="100" x2="390" y2="100" stroke="#c4a7e7" />
+    <text font-size="13" fill="#908caa" x="396" y="104">GPIO 25 (probe drive)</text>
+    <line fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" x1="546" y1="100" x2="570" y2="100" stroke="#ebbcba" />
+    <text font-size="13" fill="#908caa" x="576" y="104">A0 node</text>
+    <circle fill="none" stroke="#eb6f92" stroke-width="2" stroke-dasharray="4 3" cx="654" cy="100" r="9" />
+    <text font-size="13" fill="#908caa" x="670" y="104">no header pin here</text>
+    <circle fill="#e0def4" cx="820" cy="100" r="7" />
+    <text font-size="13" fill="#908caa" x="834" y="104">header pin / solder joint</text>
+  </g>
+  <rect x="280" y="130" width="370" height="850" rx="18" fill="#26233a" stroke="#6e6a86" stroke-width="2" />
+  <text fill="#908caa" font-size="12px" x="465" y="166" text-anchor="middle">top · WiFi antenna end</text>
+  <text fill="#908caa" font-size="12px" x="465" y="958" text-anchor="middle">board continues: SMA antenna, GPS, battery</text>
+  <text fill="#908caa" font-size="12px" x="465" y="186" text-anchor="middle" font-weight="700">LilyGO T-Beam v1.2</text>
+  <g>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="262" y="205">VP 36</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="262" y="249">VN 39</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="262" y="293">RST</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="262" y="337">15</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="262" y="381">35</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="262" y="425">32</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="262" y="469">33</text>
+    <text text-anchor="end" fill="#c4a7e7" font-size="14px" x="262" y="513" font-weight="700">GPIO 25 (8)</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="262" y="557">14</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="262" y="601">13</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="262" y="645">2</text>
+    <text text-anchor="end" fill="#e0def4" font-size="14px" x="262" y="689" font-weight="700">GND (12)</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="262" y="733">5V</text>
+  </g>
+  <g>
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="320" cy="200" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="320" cy="244" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="320" cy="288" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="320" cy="332" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="320" cy="376" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="320" cy="420" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="320" cy="464" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="320" cy="552" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="320" cy="596" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="320" cy="640" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="320" cy="728" r="8" />
+  </g>
+  <g>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="586" y="205">TX (1)</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="586" y="249">RX (2)</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="586" y="293">23 (3)</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="586" y="337">4 (4)</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="586" y="381">0 (5)</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="586" y="425">GND (6)</text>
+    <text text-anchor="end" fill="#eb6f92" font-size="14px" x="586" y="469" font-weight="700">3V3 (7)</text>
+    <text text-anchor="end" fill="#e0def4" font-size="14px" x="586" y="513" font-weight="700">GND (8)</text>
+    <text text-anchor="end" fill="#f6c177" font-size="14px" x="586" y="557" font-weight="700">22 (9)</text>
+    <text text-anchor="end" fill="#9ccfd8" font-size="14px" x="586" y="601" font-weight="700">21 (10)</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="586" y="645">3V3 (11)</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="586" y="689">LoRa IO (12)</text>
+    <text text-anchor="end" fill="#908caa" font-size="14px" x="586" y="733">LoRa IO (13)</text>
+  </g>
+  <g>
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="610" cy="200" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="610" cy="244" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="610" cy="288" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="610" cy="332" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="610" cy="376" r="8" />
+    <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="610" cy="420" r="8" />
+  </g>
+  <rect x="594" y="440" width="266" height="444" rx="8" fill="#31748f" fill-opacity="0.28" stroke="#9ccfd8" stroke-width="2" />
+  <text x="800" y="610" fill="#9ccfd8" font-size="18" font-weight="700" text-anchor="middle" transform="rotate(-90 800 610)">ADS1115 module</text>
+  <text fill="#908caa" font-size="12px" x="836" y="610" text-anchor="middle" transform="rotate(-90 836 610)">hangs off the T-Beam edge</text>
+  <path fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M610 508 H648 V640 H610" stroke="#908caa" />
+  <circle cx="610" cy="464" r="9" fill="#eb6f92" stroke="#e0def4" stroke-width="2" />
+  <circle cx="610" cy="508" r="9" fill="#908caa" stroke="#e0def4" stroke-width="2" />
+  <circle cx="610" cy="552" r="9" fill="#f6c177" stroke="#e0def4" stroke-width="2" />
+  <circle cx="610" cy="596" r="9" fill="#9ccfd8" stroke="#e0def4" stroke-width="2" />
+  <circle cx="610" cy="640" r="8" fill="#191724" stroke="#908caa" stroke-width="3" />
+  <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="610" cy="684" r="8" />
+  <circle cx="610" cy="728" r="8" fill="#191724" stroke="#ebbcba" stroke-width="3" />
+  <circle fill="none" stroke="#eb6f92" stroke-width="2" stroke-dasharray="4 3" cx="610" cy="640" r="14" />
+  <circle fill="none" stroke="#eb6f92" stroke-width="2" stroke-dasharray="4 3" cx="610" cy="684" r="14" />
+  <circle fill="none" stroke="#eb6f92" stroke-width="2" stroke-dasharray="4 3" cx="610" cy="728" r="14" />
+  <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="610" cy="772" r="8" />
+  <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="610" cy="816" r="8" />
+  <circle fill="#191724" stroke="#6e6a86" stroke-width="2" cx="610" cy="860" r="8" />
+  <g>
+    <text fill="#e0def4" font-size="14px" font-weight="600" x="672" y="469">VDD</text>
+    <text fill="#e0def4" font-size="14px" font-weight="600" x="672" y="513">GND</text>
+    <text fill="#e0def4" font-size="14px" font-weight="600" x="672" y="557">SCL</text>
+    <text fill="#e0def4" font-size="14px" font-weight="600" x="672" y="601">SDA</text>
+    <text fill="#e0def4" font-size="14px" font-weight="600" x="672" y="645">ADDR</text>
+    <text fill="#908caa" font-size="14px" x="672" y="689">ALRT</text>
+    <text fill="#e0def4" font-size="14px" font-weight="600" x="672" y="733">A0</text>
+    <text fill="#908caa" font-size="14px" x="672" y="777">A1</text>
+    <text fill="#908caa" font-size="14px" x="672" y="821">A2</text>
+    <text fill="#908caa" font-size="14px" x="672" y="865">A3</text>
+  </g>
+  <g>
+    <text fill="#908caa" font-size="12px" x="880" y="430">ADS pad → what to do</text>
+    <text fill="#e0def4" font-size="14px" x="880" y="469">pin to 3V3 (7)</text>
+    <text fill="#e0def4" font-size="14px" x="880" y="513">pin to GND (8)</text>
+    <text fill="#e0def4" font-size="14px" x="880" y="557">pin to 22 (9)</text>
+    <text fill="#e0def4" font-size="14px" x="880" y="601">pin to 21 (10)</text>
+    <text fill="#eb6f92" font-size="14px" x="880" y="645">no pin · wire to GND</text>
+    <text fill="#eb6f92" font-size="14px" x="880" y="689">no pin · leave empty</text>
+    <text fill="#eb6f92" font-size="14px" x="880" y="733">no pin · 100 kΩ + lead A</text>
+  </g>
+  <path fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M610 728 L566 756 V772" stroke="#ebbcba" />
+  <path fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M566 772 l9 6 l-18 12 l18 12 l-18 12 l18 12 l-18 12 l9 6" stroke="#e0def4" />
+  <path fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M566 852 V900 H362 V508 H320" stroke="#c4a7e7" />
+  <circle cx="320" cy="508" r="8" fill="#c4a7e7" stroke="#e0def4" stroke-width="2" />
+  <text fill="#e0def4" font-size="14px" x="552" y="808" text-anchor="end" font-weight="700">100 kΩ</text>
+  <text fill="#908caa" font-size="12px" x="552" y="826" text-anchor="end">1 %, measured</text>
+  <text fill="#908caa" font-size="12px" x="372" y="890">wire on top of the board</text>
+  <path fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M610 728 L634 750 H900 V1030" stroke="#ebbcba" />
+  <path fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M320 684 H340 V1030" stroke="#908caa" />
+  <circle cx="320" cy="684" r="8" fill="#908caa" stroke="#e0def4" stroke-width="2" />
+  <text fill="#e0def4" font-size="14px" x="910" y="900">lead A</text>
+  <text fill="#908caa" font-size="12px" x="910" y="918">A0 node</text>
+  <text fill="#e0def4" font-size="14px" x="270" y="1010" text-anchor="end">lead B</text>
+  <text fill="#908caa" font-size="12px" x="270" y="1026" text-anchor="end">GND</text>
+  <rect x="290" y="1040" width="720" height="70" rx="6" fill="#26233a" stroke="#6e6a86" stroke-width="2" />
+  <text fill="#908caa" font-size="14px" x="620" y="1082" text-anchor="middle">wood</text>
+  <rect x="314" y="1028" width="52" height="10" rx="2" fill="#908caa" />
+  <rect x="874" y="1028" width="52" height="10" rx="2" fill="#908caa" />
+  <line x1="340" y1="1040" x2="340" y2="1100" stroke="#e0def4" stroke-width="5" />
+  <line x1="900" y1="1040" x2="900" y2="1100" stroke="#e0def4" stroke-width="5" />
+  <text fill="#908caa" font-size="12px" x="380" y="1066">screw B + steel plate</text>
+  <text fill="#908caa" font-size="12px" x="860" y="1066" text-anchor="end">screw A + steel plate</text>
+  <text fill="#908caa" font-size="12px" x="620" y="1136" text-anchor="middle">leads as long as the install needs · plate must press firmly on the screw head</text>
+  <text fill="#e0def4" font-size="17px" font-weight="700" x="40" y="1190">Side view from the right edge</text>
+  <rect x="60" y="1330" width="460" height="12" fill="#26233a" stroke="#6e6a86" stroke-width="2" />
+  <text fill="#908caa" font-size="12px" x="54" y="1341" text-anchor="end">T-Beam</text>
+  <rect x="112" y="1300" width="176" height="30" fill="#6e6a86" />
+  <text fill="#908caa" font-size="12px" x="54" y="1319" text-anchor="end">spacer</text>
+  <rect x="104" y="1288" width="480" height="12" fill="#31748f" fill-opacity="0.5" stroke="#9ccfd8" stroke-width="2" />
+  <text x="590" y="1298" fill="#9ccfd8" font-size="12" font-weight="700">ADS1115</text>
+  <g stroke-width="3" stroke-linecap="round">
+    <line x1="128" y1="1276" x2="128" y2="1354" stroke="#eb6f92" />
+    <line x1="176" y1="1276" x2="176" y2="1354" stroke="#908caa" />
+    <line x1="224" y1="1276" x2="224" y2="1354" stroke="#f6c177" />
+    <line x1="272" y1="1276" x2="272" y2="1354" stroke="#9ccfd8" />
+  </g>
+  <g>
+    <ellipse fill="#e0def4" cx="128" cy="1286" rx="8" ry="4" />
+    <ellipse fill="#e0def4" cx="128" cy="1345" rx="8" ry="4" />
+    <ellipse fill="#e0def4" cx="176" cy="1286" rx="8" ry="4" />
+    <ellipse fill="#e0def4" cx="176" cy="1345" rx="8" ry="4" />
+    <ellipse fill="#e0def4" cx="224" cy="1286" rx="8" ry="4" />
+    <ellipse fill="#e0def4" cx="224" cy="1345" rx="8" ry="4" />
+    <ellipse fill="#e0def4" cx="272" cy="1286" rx="8" ry="4" />
+    <ellipse fill="#e0def4" cx="272" cy="1345" rx="8" ry="4" />
+  </g>
+  <path fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M176 1284 C176 1246 320 1246 320 1284" stroke="#908caa" />
+  <path fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M416 1226 V1300" stroke="#ebbcba" />
+  <text fill="#908caa" font-size="12px" x="248" y="1240" text-anchor="middle">ADDR jumper</text>
+  <text fill="#908caa" font-size="12px" x="426" y="1236">100 kΩ leg + lead A</text>
+  <g>
+    <text text-anchor="middle" fill="#908caa" font-size="12px" x="128" y="1372">3V3</text>
+    <text text-anchor="middle" fill="#908caa" font-size="12px" x="176" y="1372">GND</text>
+    <text text-anchor="middle" fill="#908caa" font-size="12px" x="224" y="1372">22</text>
+    <text text-anchor="middle" fill="#908caa" font-size="12px" x="272" y="1372">21</text>
+    <text text-anchor="middle" fill="#908caa" font-size="12px" x="320" y="1372">3V3</text>
+    <text text-anchor="middle" fill="#908caa" font-size="12px" x="368" y="1372">IO</text>
+    <text text-anchor="middle" fill="#908caa" font-size="12px" x="416" y="1372">IO</text>
+  </g>
+  <rect fill="none" stroke="#eb6f92" stroke-width="2" stroke-dasharray="4 3" x="300" y="1302" width="136" height="26" rx="3" />
+  <text fill="#eb6f92" font-size="14px" x="40" y="1400">Gap under 11-13 stays empty: no pins, nothing</text>
+  <text fill="#eb6f92" font-size="14px" x="40" y="1418">poking through. Trim the ADDR and A0 wire ends flush.</text>
+  <text fill="#e0def4" font-size="17px" font-weight="700" x="660" y="1190">Circuit</text>
+  <g stroke-width="3" stroke-linecap="round">
+    <text fill="#c4a7e7" x="760" y="1214" font-size="14" font-weight="700" text-anchor="middle" stroke="none">GPIO 25</text>
+    <path fill="none" d="M760 1222 V1234" stroke="#c4a7e7" />
+    <path fill="none" d="M760 1234 l8 5 l-16 10 l16 10 l-16 10 l16 10 l-8 5" stroke="#e0def4" />
+    <path fill="none" d="M760 1284 V1316" stroke="#ebbcba" />
+    <path fill="none" d="M760 1300 H850" stroke="#ebbcba" />
+    <rect fill="#26233a" x="744" y="1316" width="32" height="34" stroke="#6e6a86" />
+    <path fill="none" d="M760 1350 V1374" stroke="#908caa" />
+    <path fill="none" d="M744 1374 H776 M750 1381 H770 M756 1388 H764" stroke="#908caa" />
+  </g>
+  <circle cx="760" cy="1300" r="5" fill="#ebbcba" />
+  <text fill="#e0def4" font-size="14px" x="776" y="1262">100 kΩ</text>
+  <text fill="#ebbcba" font-size="14px" x="856" y="1305">ADS1115 A0</text>
+  <text fill="#908caa" font-size="12px" x="784" y="1338">screw A · wood · screw B</text>
+  <text fill="#908caa" font-size="12px" x="776" y="1392">GND</text>
+  <text fill="#908caa" font-size="12px" x="860" y="1362">A0 = 3.3 V × R / (100 k + R)</text>
+  <text fill="#908caa" font-size="12px" x="860" y="1380">dry: high R, A0 near 3.3 V</text>
+  <text fill="#908caa" font-size="12px" x="860" y="1398">wet: low R, A0 near 0 V</text>
+</svg>

@@ -86,7 +86,7 @@ ESP32 ADC pin, and the ADS1115 shares the PMIC's I2C bus.
                      GND
 ```
 
-Full assembly detail (parts, soldering notes, nail-contact tips): [Soldering: Wood Moisture Prototype](soldering_prototype.md).
+Full assembly detail (parts, header pin map, solder steps, checks): [Soldering: Wood Moisture Prototype](soldering_prototype.md).
 
 **ADS1115 connections:**
 
