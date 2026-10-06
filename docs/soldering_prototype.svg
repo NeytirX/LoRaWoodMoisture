@@ -136,9 +136,9 @@
   <rect x="874" y="1028" width="52" height="10" rx="2" fill="#908caa" />
   <line x1="340" y1="1040" x2="340" y2="1100" stroke="#e0def4" stroke-width="5" />
   <line x1="900" y1="1040" x2="900" y2="1100" stroke="#e0def4" stroke-width="5" />
-  <text fill="#908caa" font-size="12px" x="380" y="1066">screw B + steel plate</text>
-  <text fill="#908caa" font-size="12px" x="860" y="1066" text-anchor="end">screw A + steel plate</text>
-  <text fill="#908caa" font-size="12px" x="620" y="1136" text-anchor="middle">leads as long as the install needs · plate must press firmly on the screw head</text>
+  <text fill="#908caa" font-size="12px" x="380" y="1066">screw B + A2 eyelet</text>
+  <text fill="#908caa" font-size="12px" x="860" y="1066" text-anchor="end">screw A + A2 eyelet</text>
+  <text fill="#908caa" font-size="12px" x="620" y="1136" text-anchor="middle">leads as long as the install needs · eyelet clamped firmly under the screw head, nylon washer below</text>
   <text fill="#e0def4" font-size="17px" font-weight="700" x="40" y="1190">Side view from the right edge</text>
   <rect x="60" y="1330" width="460" height="12" fill="#26233a" stroke="#6e6a86" stroke-width="2" />
   <text fill="#908caa" font-size="12px" x="54" y="1341" text-anchor="end">T-Beam</text>

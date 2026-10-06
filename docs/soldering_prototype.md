@@ -7,9 +7,10 @@ docs/deployment_guide.md §2.1 for the field-deployment wiring pointer.
 
 - **Board: LilyGO T-Beam v1.2** (AXP2101 PMIC), 868 MHz version. The frequency
   variant changes nothing here: same header, same wiring.
-- **Probe = two screws in the wood** (two-electrode resistive). Each screw is
-  contacted by a steel plate pressed onto its head. Resistance between the
-  screws falls as moisture rises.
+- **Probe = two bare A2 stainless screws in the wood** (two-electrode
+  resistive). Each lead is soldered to an A2 stainless eyelet (ring terminal);
+  the screw passes through the eyelet and clamps it under its head. Resistance
+  between the screws falls as moisture rises.
 - **ADS1115** (16-bit I2C ADC) is stacked straight onto the T-Beam header and
   reads the divider node on A0. The ESP32 internal ADC (GPIO 35) is unused.
 - **No DS18B20 in this build.** Its wiring, for later, is in
@@ -29,6 +30,8 @@ docs/deployment_guide.md §2.1 for the field-deployment wiring pointer.
 | 100 kΩ resistor, 1 % | measured before fitting (see step 2) |
 | thin insulated wire | ADDR jumper, GPIO 25 wire, probe leads A and B |
 | heat shrink | for the lead A joint |
+| A2 stainless eyelet (ring terminal), 2 | one per screw, soldered to its lead |
+| nylon washer, 2 | under each eyelet, keeps it off the wood surface |
 
 ## Header pin positions (T-Beam v1.2)
 
@@ -85,8 +88,9 @@ Positions 11-13 are why only four pins go in: 11 is 3V3 (`VCC_2_5V`, tied to
 7. **Probe lead A** soldered to the resistor's A0 leg just above the pad,
    heat shrink over the joint.
 8. **Probe lead B** to the T-Beam **left** hole GND (position 12).
-9. **Leads to the plates**, one per screw. Which screw gets A or B does not
-   matter.
+9. **Leads to the eyelets**, one per screw: solder each lead to its eyelet and
+   wash the flux off. Fit a nylon washer, then the eyelet, under each screw head
+   and tighten. Which screw gets A or B does not matter.
 
 Repeat for the second board.
 
@@ -99,7 +103,7 @@ Repeat for the second board.
 | left GPIO 25 (8) and ADS A0 | the value written on the board, ~100 kΩ |
 | ADS A0 and T-Beam right position 13 | open, no connection |
 | lead A and lead B, screws not in wood | open, > 10 MΩ |
-| each lead end and its screw head, plate mounted | < 1 Ω |
+| each lead end and its screw head, eyelet clamped | < 1 Ω |
 
 Then power up with serial at 115200. The sensor init line should read:
 
@@ -115,9 +119,9 @@ Then power up with serial at 115200. The sensor init line should read:
 ```
   GPIO 25 ──100kΩ(1%)──┬── ADS1115 A0   (ADC reads this node)
  (drive HIGH only       │
-  during a measurement) screw A + plate
+  during a measurement) screw A + eyelet
                         (wood)
-                        screw B + plate
+                        screw B + eyelet
                          │
                         GND
 
@@ -156,10 +160,15 @@ Then power up with serial at 115200. The sensor init line should read:
   in `include/wood_species_data.h`, a resistor 1 % off shifts the reading by
   about 0.03 MC points, 5 % off by about 0.15. A standard 1 % part is fine;
   record its measured value anyway.
-- **Screw contacts.** A loose or rusted plate adds resistance in series with
-  the wood and reads as drier wood, or as an open circuit. Use the same steel
-  for screws and plates to avoid galvanic corrosion, and keep the plates
-  pressed firmly.
+- **Screw contacts.** A loose or corroded eyelet adds resistance in series
+  with the wood and reads as drier wood, or as an open circuit. Screw and eyelet
+  are both A2 stainless, so there is no galvanic pair at the clamp; keep it
+  tight. Soldering to stainless needs an aggressive flux: wash the residue off,
+  since it corrodes the joint and leaks current.
+- **Nylon washer under each eyelet.** The eyelet and screw head sit on the wood
+  surface, which is wetter than the core right after wetting; the washer keeps
+  that surface out of the reading. Shaft insulation is not needed at ~5 mm
+  depth in a 10 mm slab: the whole embedded length is the measuring tip.
 - **GPIO 35 and GPIO 32 stay free.** On v1.2, GPIO 35 is the AXP2101 interrupt
   (per LilyGO's pin map) and GPIO 32 is the radio BUSY line.
 - ADS1115 used **single-ended on A0** (node to GND).
