@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1010" width="1100" height="1010" role="img" aria-labelledby="t d" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title id="t">Oscillator wiring map</title>
+  <desc id="d">Perfboard wiring map for the MCP6002 relaxation oscillator: the chip seen from the top, each pin labelled with its net, and one card per solder net listing every leg that joins it. Includes solder order, checks and a plain explanation.</desc>
+  <rect width="1100" height="1010" fill="#191724"/>
+
+  <text x="40" y="44" fill="#e0def4" font-size="24" font-weight="700">Oscillator wiring map · MCP6002 on perfboard</text>
+  <text x="40" y="70" fill="#908caa" font-size="14">Top view, notch up. Each colour is one solder net: join every leg listed in that net, and nothing else. Not bench-verified.</text>
+
+  <!-- Chip, top view -->
+  <rect x="200" y="150" width="140" height="320" rx="6" fill="#26233a" stroke="#e0def4" stroke-width="2"/>
+  <path d="M256 150 A14 14 0 0 0 284 150" fill="#191724" stroke="#e0def4" stroke-width="2"/>
+  <circle cx="216" cy="168" r="4" fill="#e0def4"/>
+  <text x="270" y="320" fill="#908caa" font-size="13" text-anchor="middle" transform="rotate(-90 270 320)">MCP6002</text>
+
+  <!-- Left pins 1-4 -->
+  <g font-size="11" fill="#e0def4">
+    <text x="208" y="194">1 OUT A</text>
+    <text x="208" y="274">2 IN− A</text>
+    <text x="208" y="354">3 IN+ A</text>
+    <text x="208" y="434">4 VSS</text>
+    <text x="332" y="194" text-anchor="end">VDD 8</text>
+    <text x="332" y="274" text-anchor="end">OUT B 7</text>
+    <text x="332" y="354" text-anchor="end">IN− B 6</text>
+    <text x="332" y="434" text-anchor="end">IN+ B 5</text>
+  </g>
+  <path d="M200 190 H140" stroke="#f6c177" stroke-width="5" stroke-linecap="round"/>
+  <path d="M200 270 L150 238" stroke="#eb6f92" stroke-width="5" stroke-linecap="round" stroke-dasharray="7 5"/>
+  <path d="M200 350 H140" stroke="#31748f" stroke-width="5" stroke-linecap="round"/>
+  <path d="M200 430 H140" stroke="#908caa" stroke-width="5" stroke-linecap="round"/>
+  <g font-size="13" font-weight="700" text-anchor="end">
+    <text x="132" y="195" fill="#f6c177">VO</text>
+    <text x="142" y="232" fill="#eb6f92">HIGH-Z</text>
+    <text x="132" y="355" fill="#9ccfd8">P</text>
+    <text x="132" y="435" fill="#908caa">GND</text>
+  </g>
+  <text x="142" y="250" fill="#eb6f92" font-size="11" text-anchor="end">bent out, in the air</text>
+
+  <!-- Right pins 5-8 -->
+  <path d="M340 190 H400" stroke="#c4a7e7" stroke-width="5" stroke-linecap="round"/>
+  <path d="M340 270 H400" stroke="#9ccfd8" stroke-width="5" stroke-linecap="round"/>
+  <path d="M340 350 H400" stroke="#9ccfd8" stroke-width="5" stroke-linecap="round"/>
+  <path d="M340 430 H400" stroke="#ebbcba" stroke-width="5" stroke-linecap="round"/>
+  <path d="M372 270 V350" stroke="#9ccfd8" stroke-width="4"/>
+  <circle cx="372" cy="270" r="4" fill="#9ccfd8"/>
+  <circle cx="372" cy="350" r="4" fill="#9ccfd8"/>
+  <text x="380" y="314" fill="#9ccfd8" font-size="11">link 6-7</text>
+  <g font-size="13" font-weight="700">
+    <text x="408" y="195" fill="#c4a7e7">3V3_SW</text>
+    <text x="408" y="275" fill="#9ccfd8">VMID</text>
+    <text x="408" y="355" fill="#9ccfd8">VMID</text>
+    <text x="408" y="435" fill="#ebbcba">M</text>
+  </g>
+
+  <text x="60" y="510" fill="#eb6f92" font-size="13" font-weight="700">Pin 2 never goes through the board.</text>
+  <text x="60" y="528" fill="#908caa" font-size="12">Bend it out flat before inserting the chip, then solder C1 and</text>
+  <text x="60" y="545" fill="#908caa" font-size="12">probe lead A onto it in the air. Board leakage there reads as dry wood.</text>
+
+  <!-- Net cards -->
+  <g font-size="13">
+    <rect x="530" y="110" width="540" height="58" rx="8" fill="#1f1d2e"/><rect x="530" y="110" width="8" height="58" rx="3" fill="#c4a7e7"/>
+    <text x="550" y="132" fill="#c4a7e7" font-weight="700">3V3_SW · supply, on only while measuring</text>
+    <text x="550" y="154" fill="#e0def4">T-Beam GPIO 25 wire (left 8) · pin 8 · R3 one leg · C3 one leg</text>
+
+    <rect x="530" y="176" width="540" height="58" rx="8" fill="#1f1d2e"/><rect x="530" y="176" width="8" height="58" rx="3" fill="#908caa"/>
+    <text x="550" y="198" fill="#908caa" font-weight="700">GND</text>
+    <text x="550" y="220" fill="#e0def4">T-Beam GND wire (left 12) · pin 4 · R4 one leg · C2 one leg · C3 other leg</text>
+
+    <rect x="530" y="242" width="540" height="58" rx="8" fill="#1f1d2e"/><rect x="530" y="242" width="8" height="58" rx="3" fill="#ebbcba"/>
+    <text x="550" y="264" fill="#ebbcba" font-weight="700">M · middle of the 1M/1M divider</text>
+    <text x="550" y="286" fill="#e0def4">pin 5 · R3 other leg · R4 other leg · C2 other leg</text>
+
+    <rect x="530" y="308" width="540" height="58" rx="8" fill="#1f1d2e"/><rect x="530" y="308" width="8" height="58" rx="3" fill="#9ccfd8"/>
+    <text x="550" y="330" fill="#9ccfd8" font-weight="700">VMID · steady 1.65 V reference</text>
+    <text x="550" y="352" fill="#e0def4">pin 6 · pin 7 · R1 one leg · C1 one leg</text>
+
+    <rect x="530" y="374" width="540" height="58" rx="8" fill="#1f1d2e"/><rect x="530" y="374" width="8" height="58" rx="3" fill="#31748f"/>
+    <text x="550" y="396" fill="#9ccfd8" font-weight="700">P · switching threshold</text>
+    <text x="550" y="418" fill="#e0def4">pin 3 · R1 other leg · R2 one leg</text>
+
+    <rect x="530" y="440" width="540" height="76" rx="8" fill="#1f1d2e"/><rect x="530" y="440" width="8" height="76" rx="3" fill="#f6c177"/>
+    <text x="550" y="462" fill="#f6c177" font-weight="700">VO · square wave out</text>
+    <text x="550" y="484" fill="#e0def4">pin 1 · R2 other leg · probe lead B (J1-B)</text>
+    <text x="550" y="504" fill="#e0def4">· wire to T-Beam GPIO 13 (left 10)</text>
+
+    <rect x="530" y="524" width="540" height="76" rx="8" fill="#1f1d2e" stroke="#eb6f92" stroke-width="1.5"/><rect x="530" y="524" width="8" height="76" rx="3" fill="#eb6f92"/>
+    <text x="550" y="546" fill="#eb6f92" font-weight="700">HIGH-Z · the sensitive node, in the air</text>
+    <text x="550" y="568" fill="#e0def4">pin 2 (bent out) · C1 other leg · probe lead A (J1-A)</text>
+    <text x="550" y="588" fill="#e0def4">· nothing else, and never the perfboard</text>
+  </g>
+
+  <!-- Solder order -->
+  <rect x="30" y="622" width="660" height="210" rx="10" fill="#1f1d2e"/>
+  <text x="50" y="650" fill="#e0def4" font-size="16" font-weight="700">Solder order</text>
+  <g fill="#e0def4" font-size="13">
+    <text x="50" y="676">1. Bend pin 2 out flat. Insert the chip, notch up; solder pins 1, 3, 4, 5, 6, 7, 8.</text>
+    <text x="50" y="698">2. Link pin 6 to pin 7.</text>
+    <text x="50" y="720">3. Net M on pin 5: R3, R4, C2. C3 across pins 8 and 4, close to the chip.</text>
+    <text x="50" y="742">4. R1 from pin 3 to VMID; R2 from pin 1 to pin 3.</text>
+    <text x="50" y="764">5. In the air on pin 2: C1 (other leg to VMID) and probe lead A.</text>
+    <text x="50" y="786">6. On pin 1: probe lead B and the GPIO 13 wire. Then the 3V3_SW and GND wires.</text>
+    <text x="50" y="808">7. Wash the flux off with isopropyl alcohol, around pin 2 above all.</text>
+  </g>
+
+  <!-- Parts -->
+  <rect x="710" y="622" width="360" height="210" rx="10" fill="#1f1d2e"/>
+  <text x="730" y="650" fill="#e0def4" font-size="16" font-weight="700">Parts (one board)</text>
+  <g fill="#e0def4" font-size="13">
+    <text x="730" y="676">U1 · MCP6002, 8-pin DIP</text>
+    <text x="730" y="698">R1, R2, R3, R4 · 1 MΩ</text>
+    <text x="730" y="720">C1 · 330 pF (C0G)</text>
+    <text x="730" y="742">C2, C3 · 100 nF</text>
+    <text x="730" y="764">J1 · probe leads A and B</text>
+    <text x="730" y="786">3 wires to the T-Beam:</text>
+    <text x="730" y="808">GPIO 25, GPIO 13, GND (left 8, 10, 12)</text>
+  </g>
+
+  <!-- Checks -->
+  <rect x="30" y="846" width="660" height="150" rx="10" fill="#1f1d2e"/>
+  <text x="50" y="874" fill="#e0def4" font-size="16" font-weight="700">Checks</text>
+  <g fill="#e0def4" font-size="13">
+    <text x="50" y="900">Power off: 3V3_SW to GND is not a short. Lead A to every other net reads open.</text>
+    <text x="50" y="922">Bench test, before the GPIO 25 wire goes on: pin 8 from a 3V3 pin, meter in Hz, pin 1 to GND.</text>
+    <text x="50" y="944">1 MΩ across J1: about 1.4 kHz · 10 MΩ: about 140 Hz (design values).</text>
+    <text x="50" y="966">Nothing across J1: no steady ticking. That is the leakage test.</text>
+  </g>
+
+  <!-- How it works -->
+  <rect x="710" y="846" width="360" height="150" rx="10" fill="#1f1d2e"/>
+  <text x="730" y="874" fill="#e0def4" font-size="16" font-weight="700">What it does</text>
+  <g fill="#908caa" font-size="13">
+    <text x="730" y="900">Pin 1 flips between 0 and 3.3 V.</text>
+    <text x="730" y="922">Each flip charges C1 through the wood.</text>
+    <text x="730" y="944">Drier wood = more resistance =</text>
+    <text x="730" y="966">slower ticking. GPIO 13 times it.</text>
+  </g>
+</svg>

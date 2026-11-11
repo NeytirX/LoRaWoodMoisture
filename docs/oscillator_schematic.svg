@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 900" width="1100" height="900" role="img" aria-labelledby="t d" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title id="t">Relaxation oscillator schematic</title>
+  <desc id="d">Single 3.3 V relaxation oscillator after Casans Berga et al. 2019: MCP6002 half A as a Schmitt trigger with the wood and a 330 pF capacitor setting the period, half B buffering a mid-supply rail. Output to T-Beam GPIO 13, supply from GPIO 25.</desc>
+  <rect width="1100" height="900" fill="#191724"/>
+
+  <!-- Title and legend -->
+  <text x="40" y="44" fill="#e0def4" font-size="24" font-weight="700">Relaxation oscillator · dry-range front end</text>
+  <text x="40" y="70" fill="#908caa" font-size="14">Casans Berga et al. (2019) method on one 3.3 V supply. U1 = MCP6002 dual op-amp. Not bench-verified: design start values.</text>
+  <g font-size="13" fill="#908caa">
+    <line x1="40" y1="100" x2="64" y2="100" stroke="#c4a7e7" stroke-width="4" stroke-linecap="round"/><text x="70" y="104">3V3_SW (GPIO 25)</text>
+    <line x1="196" y1="100" x2="220" y2="100" stroke="#9ccfd8" stroke-width="4" stroke-linecap="round"/><text x="226" y="104">VMID (1.65 V)</text>
+    <line x1="330" y1="100" x2="354" y2="100" stroke="#f6c177" stroke-width="4" stroke-linecap="round"/><text x="360" y="104">VO (square wave)</text>
+    <line x1="480" y1="100" x2="504" y2="100" stroke="#eb6f92" stroke-width="4" stroke-linecap="round"/><text x="510" y="104">high-impedance node</text>
+    <line x1="660" y1="100" x2="684" y2="100" stroke="#908caa" stroke-width="4" stroke-linecap="round"/><text x="690" y="104">other / GND</text>
+  </g>
+
+  <!-- Supply block -->
+  <text x="40" y="150" fill="#e0def4" font-size="16" font-weight="700">Supply</text>
+  <path d="M120 180 H260" fill="none" stroke="#c4a7e7" stroke-width="3"/>
+  <text x="40" y="172" fill="#908caa" font-size="12">GPIO 25</text>
+  <text x="266" y="185" fill="#c4a7e7" font-size="13" font-weight="700">3V3_SW</text>
+  <circle cx="180" cy="180" r="4" fill="#c4a7e7"/>
+  <path d="M180 180 V222" fill="none" stroke="#c4a7e7" stroke-width="3"/>
+  <path d="M164 222 H196 M164 232 H196" fill="none" stroke="#e0def4" stroke-width="3"/>
+  <path d="M180 232 V262 M166 262 H194 M171 268 H189 M176 274 H184" fill="none" stroke="#908caa" stroke-width="3"/>
+  <text x="204" y="232" fill="#e0def4" font-size="13">C3 100 nF</text>
+  <text x="40" y="304" fill="#908caa" font-size="13">U1 pin 8 (VDD) = 3V3_SW</text>
+  <text x="40" y="322" fill="#908caa" font-size="13">U1 pin 4 (VSS) = GND</text>
+  <text x="40" y="340" fill="#908caa" font-size="12">C3 right at pins 8 and 4</text>
+
+  <!-- U1A Schmitt trigger -->
+  <path d="M470 250 L470 370 L580 310 Z" fill="#26233a" stroke="#e0def4" stroke-width="2"/>
+  <text x="478" y="286" fill="#e0def4" font-size="18">−</text>
+  <text x="478" y="346" fill="#e0def4" font-size="18">+</text>
+  <text x="505" y="315" fill="#908caa" font-size="12">U1A</text>
+  <text x="452" y="272" fill="#908caa" font-size="11">2</text>
+  <text x="452" y="332" fill="#908caa" font-size="11">3</text>
+  <text x="590" y="302" fill="#908caa" font-size="11">1</text>
+
+  <!-- High-impedance node X: pin 2, C1 top, probe A -->
+  <path d="M470 280 H440 V180 H844" fill="none" stroke="#eb6f92" stroke-width="3"/>
+  <path d="M440 280 H260 V400" fill="none" stroke="#eb6f92" stroke-width="3"/>
+  <circle cx="440" cy="280" r="4" fill="#eb6f92"/>
+  <path d="M244 400 H276 M244 410 H276" fill="none" stroke="#e0def4" stroke-width="3"/>
+  <text x="236" y="402" fill="#e0def4" font-size="13" text-anchor="end">C1 330 pF</text>
+  <text x="236" y="418" fill="#908caa" font-size="12" text-anchor="end">C0G</text>
+  <path d="M260 410 V560" fill="none" stroke="#9ccfd8" stroke-width="3"/>
+
+  <!-- Node P: pin 3, R1 to VMID, R2 from VO -->
+  <path d="M470 340 H440" fill="none" stroke="#908caa" stroke-width="3"/>
+  <circle cx="440" cy="340" r="4" fill="#908caa"/>
+  <path d="M440 340 H340 V380" fill="none" stroke="#908caa" stroke-width="3"/>
+  <path d="M340 380 l8 6 l-16 12 l16 12 l-16 12 l16 12 l-16 12 l8 4" fill="none" stroke="#e0def4" stroke-width="3"/>
+  <path d="M340 450 V560" fill="none" stroke="#9ccfd8" stroke-width="3"/>
+  <text x="356" y="420" fill="#e0def4" font-size="13">R1 1 MΩ</text>
+  <path d="M440 340 V480 H520" fill="none" stroke="#908caa" stroke-width="3"/>
+  <path d="M520 480 l6 -8 l12 16 l12 -16 l12 16 l12 -16 l12 16 l6 -8" fill="none" stroke="#e0def4" stroke-width="3"/>
+  <path d="M592 480 H640 V310" fill="none" stroke="#f6c177" stroke-width="3"/>
+  <text x="530" y="508" fill="#e0def4" font-size="13">R2 1 MΩ</text>
+
+  <!-- VO -->
+  <path d="M580 310 H844" fill="none" stroke="#f6c177" stroke-width="3"/>
+  <circle cx="640" cy="310" r="4" fill="#f6c177"/>
+  <circle cx="720" cy="310" r="4" fill="#f6c177"/>
+  <path d="M720 310 V400 H830" fill="none" stroke="#f6c177" stroke-width="3"/>
+  <path d="M830 392 L846 400 L830 408 Z" fill="#f6c177"/>
+  <text x="854" y="405" fill="#f6c177" font-size="13" font-weight="700">GPIO 13</text>
+  <text x="854" y="423" fill="#908caa" font-size="12">period timing</text>
+  <text x="652" y="300" fill="#f6c177" font-size="13" font-weight="700">VO</text>
+
+  <!-- Probe input and wood -->
+  <rect x="870" y="148" width="190" height="200" rx="10" fill="none" stroke="#6e6a86" stroke-width="2" stroke-dasharray="6 4"/>
+  <circle cx="850" cy="180" r="6" fill="#191724" stroke="#eb6f92" stroke-width="3"/>
+  <circle cx="850" cy="310" r="6" fill="#191724" stroke="#f6c177" stroke-width="3"/>
+  <text x="850" y="166" fill="#908caa" font-size="12" text-anchor="middle">J1-A</text>
+  <text x="850" y="334" fill="#908caa" font-size="12" text-anchor="middle">J1-B</text>
+  <path d="M856 180 H920 V205" fill="none" stroke="#908caa" stroke-width="3"/>
+  <path d="M920 205 l8 6 l-16 12 l16 12 l-16 12 l16 12 l-16 12 l16 12 l-8 6" fill="none" stroke="#e0def4" stroke-width="3"/>
+  <path d="M920 289 V310 H856" fill="none" stroke="#908caa" stroke-width="3"/>
+  <text x="942" y="236" fill="#e0def4" font-size="14" font-weight="700">R_wood</text>
+  <text x="942" y="256" fill="#908caa" font-size="12">screw A to screw B</text>
+  <text x="942" y="274" fill="#908caa" font-size="12">own lead pair,</text>
+  <text x="942" y="290" fill="#908caa" font-size="12">not the ADS1115 one</text>
+
+  <!-- VMID rail -->
+  <path d="M260 560 H640" fill="none" stroke="#9ccfd8" stroke-width="3"/>
+  <circle cx="260" cy="560" r="4" fill="#9ccfd8"/>
+  <circle cx="340" cy="560" r="4" fill="#9ccfd8"/>
+  <text x="470" y="552" fill="#9ccfd8" font-size="13" font-weight="700">VMID ≈ 1.65 V</text>
+
+  <!-- U1B mid-rail buffer -->
+  <path d="M470 610 L470 710 L570 660 Z" fill="#26233a" stroke="#e0def4" stroke-width="2"/>
+  <text x="478" y="636" fill="#e0def4" font-size="18">−</text>
+  <text x="478" y="696" fill="#e0def4" font-size="18">+</text>
+  <text x="500" y="665" fill="#908caa" font-size="12">U1B</text>
+  <text x="452" y="622" fill="#908caa" font-size="11">6</text>
+  <text x="452" y="682" fill="#908caa" font-size="11">5</text>
+  <text x="580" y="652" fill="#908caa" font-size="11">7</text>
+  <path d="M570 660 H640 V560" fill="none" stroke="#9ccfd8" stroke-width="3"/>
+  <path d="M470 630 H440 V600 H640" fill="none" stroke="#9ccfd8" stroke-width="3"/>
+  <circle cx="640" cy="600" r="4" fill="#9ccfd8"/>
+
+  <!-- Mid-rail divider -->
+  <text x="180" y="592" fill="#c4a7e7" font-size="13" font-weight="700" text-anchor="middle">3V3_SW</text>
+  <path d="M180 600 V615" fill="none" stroke="#c4a7e7" stroke-width="3"/>
+  <path d="M180 615 l8 5 l-16 10 l16 10 l-16 10 l16 10 l-8 5" fill="none" stroke="#e0def4" stroke-width="3"/>
+  <path d="M180 665 V705 M180 690 H470" fill="none" stroke="#908caa" stroke-width="3"/>
+  <circle cx="180" cy="690" r="4" fill="#908caa"/>
+  <circle cx="360" cy="690" r="4" fill="#908caa"/>
+  <path d="M180 705 l8 5 l-16 10 l16 10 l-16 10 l16 10 l-8 5" fill="none" stroke="#e0def4" stroke-width="3"/>
+  <path d="M180 755 V780 M166 780 H194 M171 786 H189 M176 792 H184" fill="none" stroke="#908caa" stroke-width="3"/>
+  <text x="196" y="645" fill="#e0def4" font-size="13">R3 1 MΩ</text>
+  <text x="196" y="735" fill="#e0def4" font-size="13">R4 1 MΩ</text>
+  <path d="M360 690 V730" fill="none" stroke="#908caa" stroke-width="3"/>
+  <path d="M344 730 H376 M344 740 H376" fill="none" stroke="#e0def4" stroke-width="3"/>
+  <path d="M360 740 V780 M346 780 H374 M351 786 H369 M356 792 H364" fill="none" stroke="#908caa" stroke-width="3"/>
+  <text x="384" y="740" fill="#e0def4" font-size="13">C2 100 nF</text>
+
+  <!-- How it works -->
+  <text x="700" y="480" fill="#e0def4" font-size="16" font-weight="700">How it works</text>
+  <g fill="#908caa" font-size="13">
+    <text x="700" y="504">U1A flips VO between 0 and 3.3 V. C1 charges and</text>
+    <text x="700" y="522">discharges through the wood, so the wood current</text>
+    <text x="700" y="540">reverses every half period (AC, less polarization).</text>
+    <text x="700" y="564">Thresholds: VMID ± 0.825 V (R1 = R2)</text>
+    <text x="700" y="588" fill="#f6c177" font-weight="700">T = 2 · ln 3 · R_wood · C1 ≈ 2.2 · R_wood · C1</text>
+    <text x="700" y="612">1 MΩ ≈ 0.73 ms · 10 MΩ ≈ 7.3 ms</text>
+    <text x="700" y="630">1 GΩ ≈ 0.73 s · 10 GΩ ≈ 7.3 s</text>
+    <text x="700" y="648">Real curve: fit R = a · T^b to the test resistors.</text>
+  </g>
+
+  <!-- T-Beam connections -->
+  <text x="700" y="700" fill="#e0def4" font-size="16" font-weight="700">T-Beam connections</text>
+  <g fill="#908caa" font-size="13">
+    <text x="700" y="724">GPIO 25 (left 8) → 3V3_SW</text>
+    <text x="700" y="742">GPIO 13 (left 10) ← VO</text>
+    <text x="700" y="760">GND (left 12) → GND</text>
+    <text x="700" y="778">Left 8 and 12 already carry the ADS1115 wires:</text>
+    <text x="700" y="796">add the new wire to the same joint.</text>
+  </g>
+
+  <!-- High-impedance warning -->
+  <text x="40" y="840" fill="#eb6f92" font-size="14" font-weight="700">Red node: U1 pin 2, the C1 leg and probe lead A. Solder these three together in the air, not through the perfboard.</text>
+  <text x="40" y="860" fill="#eb6f92" font-size="14">Wash the flux off with isopropyl alcohol. Any leakage here reads as drier wood.</text>
+</svg>
