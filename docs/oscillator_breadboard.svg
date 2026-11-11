@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 860" width="1100" height="860" role="img" aria-labelledby="t d" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1190" width="1100" height="1190" role="img" aria-labelledby="t d" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
   <title id="t">Oscillator breadboard layout</title>
   <desc id="d">Breadboard placement for the MCP6002 relaxation oscillator test: chip across the centre gap at rows 10 to 13, resistors, capacitors, links and power rails, with the test procedure.</desc>
-  <rect width="1100" height="860" fill="#191724"/>
+  <rect width="1100" height="1190" fill="#191724"/>
 
   <text x="40" y="44" fill="#e0def4" font-size="24" font-weight="700">Oscillator on the breadboard · test setup</text>
   <text x="40" y="70" fill="#908caa" font-size="14">Rows 8-17 shown, columns a-j, chip across the centre gap, notch toward row 1. For learning and the 1-10 MΩ test only.</text>
@@ -95,40 +95,108 @@
 
   <!-- side notes -->
   <g font-size="13">
-    <text x="790" y="120" fill="#e0def4" font-size="16" font-weight="700">Hole by hole</text>
-    <text x="790" y="146" fill="#e0def4">Chip: pins 1-4 in e10-e13,</text>
-    <text x="790" y="164" fill="#e0def4">pins 8-5 in f10-f13.</text>
-    <text x="790" y="190" fill="#908caa">R2  c10 to c12</text>
-    <text x="790" y="208" fill="#908caa">R1  a12 to a15</text>
-    <text x="790" y="226" fill="#908caa">C1  b11 to b15</text>
-    <text x="790" y="244" fill="#eb6f92">test R  d10 to d11 (the "wood")</text>
-    <text x="790" y="262" fill="#908caa">link  g11 to g12</text>
-    <text x="790" y="280" fill="#908caa">jumper  h11 to d15</text>
-    <text x="790" y="298" fill="#908caa">R3  j13 to + rail</text>
-    <text x="790" y="316" fill="#908caa">R4  i13 to − rail</text>
-    <text x="790" y="334" fill="#908caa">C2  h13 to − rail</text>
-    <text x="790" y="352" fill="#908caa">C3  h10 to − rail</text>
-    <text x="790" y="370" fill="#908caa">j10 to + rail · a13 to − rail</text>
-    <text x="790" y="388" fill="#f6c177">a10 to GPIO 13 / meter</text>
+    <text x="790" y="120" fill="#e0def4" font-size="16" font-weight="700">Power</text>
+    <text x="790" y="146" fill="#e0def4">+ rail: T-Beam 3V3 for this test</text>
+    <text x="790" y="164" fill="#908caa">(final build: GPIO 25)</text>
+    <text x="790" y="186" fill="#e0def4">− rail: T-Beam GND</text>
+    <text x="790" y="204" fill="#908caa">Bridge left and right rails.</text>
+    <text x="790" y="230" fill="#eb6f92" font-weight="700">Breadboard supply: 3.3 V only,</text>
+    <text x="790" y="248" fill="#eb6f92" font-weight="700">GND tied to the T-Beam GND.</text>
+    <text x="790" y="290" fill="#e0def4" font-size="16" font-weight="700">Direction</text>
+    <text x="790" y="316" fill="#e0def4">Only the chip has one:</text>
+    <text x="790" y="334" fill="#e0def4">notch toward row 1, pin 1 in e10.</text>
+    <text x="790" y="352" fill="#908caa">Resistors and these capacitors</text>
+    <text x="790" y="370" fill="#908caa">go in either way round.</text>
+    <text x="790" y="412" fill="#e0def4" font-size="16" font-weight="700">Reading the codes</text>
+    <text x="790" y="438" fill="#908caa">331 = 33 + 1 zero = 330 pF</text>
+    <text x="790" y="456" fill="#908caa">104 = 10 + 4 zeros = 100 nF</text>
+    <text x="790" y="474" fill="#908caa">Unsure of a band? Measure it:</text>
+    <text x="790" y="492" fill="#908caa">the multimeter decides.</text>
+  </g>
 
-    <text x="790" y="430" fill="#e0def4" font-size="16" font-weight="700">Power</text>
-    <text x="790" y="456" fill="#e0def4">+ rail: T-Beam 3V3 for this test</text>
-    <text x="790" y="474" fill="#908caa">(final build: GPIO 25)</text>
-    <text x="790" y="492" fill="#e0def4">− rail: T-Beam GND</text>
-    <text x="790" y="510" fill="#908caa">Bridge left and right rails.</text>
-    <text x="790" y="532" fill="#eb6f92" font-weight="700">Breadboard supply: 3.3 V only,</text>
-    <text x="790" y="550" fill="#eb6f92" font-weight="700">GND tied to the T-Beam GND.</text>
+  <!-- parts table -->
+  <rect x="30" y="645" width="1040" height="330" rx="10" fill="#1f1d2e"/>
+  <text x="50" y="674" fill="#e0def4" font-size="16" font-weight="700">Parts: what each label is, and where it goes</text>
+  <g font-size="12" font-weight="700" fill="#908caa">
+    <text x="50" y="700">Label</text>
+    <text x="130" y="700">What it is</text>
+    <text x="300" y="700">Looks like</text>
+    <text x="580" y="700">Its job</text>
+    <text x="880" y="700">Holes</text>
+  </g>
+  <g font-size="13">
+    <text x="50" y="724" fill="#e0def4" font-weight="700">U1</text>
+    <text x="130" y="724" fill="#e0def4">MCP6002 chip</text>
+    <text x="300" y="724" fill="#908caa">black, 8 legs, notch at one end</text>
+    <text x="580" y="724" fill="#908caa">A ticks (pins 1-3), B holds 1.65 V (5-7)</text>
+    <text x="880" y="724" fill="#e0def4">e10-e13, f10-f13</text>
+    <text x="50" y="743" fill="#e0def4" font-weight="700">R1</text>
+    <text x="130" y="743" fill="#e0def4">1 MΩ resistor</text>
+    <text x="300" y="743" fill="#908caa">brown-black-black-yellow-brown</text>
+    <text x="580" y="743" fill="#908caa">with R2, sets when the output flips</text>
+    <text x="880" y="743" fill="#e0def4">a12 to a15</text>
+    <text x="50" y="762" fill="#e0def4" font-weight="700">R2</text>
+    <text x="130" y="762" fill="#e0def4">1 MΩ resistor</text>
+    <text x="300" y="762" fill="#908caa">same bands</text>
+    <text x="580" y="762" fill="#908caa">feedback: makes the flip snap cleanly</text>
+    <text x="880" y="762" fill="#e0def4">c10 to c12</text>
+    <text x="50" y="781" fill="#e0def4" font-weight="700">R3</text>
+    <text x="130" y="781" fill="#e0def4">1 MΩ resistor</text>
+    <text x="300" y="781" fill="#908caa">same bands</text>
+    <text x="580" y="781" fill="#908caa">top half of the 3.3 V to 1.65 V divider</text>
+    <text x="880" y="781" fill="#e0def4">j13 to + rail</text>
+    <text x="50" y="800" fill="#e0def4" font-weight="700">R4</text>
+    <text x="130" y="800" fill="#e0def4">1 MΩ resistor</text>
+    <text x="300" y="800" fill="#908caa">same bands</text>
+    <text x="580" y="800" fill="#908caa">bottom half of that divider</text>
+    <text x="880" y="800" fill="#e0def4">i13 to − rail</text>
+    <text x="50" y="819" fill="#e0def4" font-weight="700">C1</text>
+    <text x="130" y="819" fill="#e0def4">330 pF capacitor</text>
+    <text x="300" y="819" fill="#908caa">small, printed 331</text>
+    <text x="580" y="819" fill="#908caa">the timer, charged through the wood</text>
+    <text x="880" y="819" fill="#e0def4">b11 to b15</text>
+    <text x="50" y="838" fill="#e0def4" font-weight="700">C2</text>
+    <text x="130" y="838" fill="#e0def4">100 nF capacitor</text>
+    <text x="300" y="838" fill="#908caa">small, printed 104</text>
+    <text x="580" y="838" fill="#908caa">keeps the 1.65 V steady</text>
+    <text x="880" y="838" fill="#e0def4">h13 to − rail</text>
+    <text x="50" y="857" fill="#e0def4" font-weight="700">C3</text>
+    <text x="130" y="857" fill="#e0def4">100 nF capacitor</text>
+    <text x="300" y="857" fill="#908caa">small, printed 104</text>
+    <text x="580" y="857" fill="#908caa">smooths the chip's supply</text>
+    <text x="880" y="857" fill="#e0def4">h10 to − rail</text>
+    <text x="50" y="876" fill="#eb6f92" font-weight="700">test R</text>
+    <text x="130" y="876" fill="#e0def4">1 MΩ or 10 MΩ</text>
+    <text x="300" y="876" fill="#908caa">10 MΩ: brown-black-black-green-brown</text>
+    <text x="580" y="876" fill="#908caa">stands in for the wood</text>
+    <text x="880" y="876" fill="#e0def4">d10 to d11</text>
+    <text x="50" y="895" fill="#9ccfd8" font-weight="700">link</text>
+    <text x="130" y="895" fill="#e0def4">short wire</text>
+    <text x="580" y="895" fill="#908caa">joins pins 6 and 7</text>
+    <text x="880" y="895" fill="#e0def4">g11 to g12</text>
+    <text x="50" y="914" fill="#9ccfd8" font-weight="700">jumper</text>
+    <text x="130" y="914" fill="#e0def4">longer wire</text>
+    <text x="580" y="914" fill="#908caa">carries 1.65 V to the left side</text>
+    <text x="880" y="914" fill="#e0def4">h11 to d15</text>
+    <text x="50" y="933" fill="#908caa" font-weight="700">wires</text>
+    <text x="130" y="933" fill="#e0def4">short wires</text>
+    <text x="580" y="933" fill="#908caa">supply and ground to the chip</text>
+    <text x="880" y="933" fill="#e0def4">j10 to +, a13 to −</text>
+    <text x="50" y="952" fill="#f6c177" font-weight="700">out</text>
+    <text x="130" y="952" fill="#e0def4">wire to T-Beam</text>
+    <text x="580" y="952" fill="#908caa">output to GPIO 13 or meter</text>
+    <text x="880" y="952" fill="#e0def4">a10</text>
   </g>
 
   <!-- test -->
-  <rect x="30" y="645" width="1040" height="195" rx="10" fill="#1f1d2e"/>
-  <text x="50" y="674" fill="#e0def4" font-size="16" font-weight="700">Test (meter in Hz between a10 and the − rail)</text>
+  <rect x="30" y="990" width="1040" height="190" rx="10" fill="#1f1d2e"/>
+  <text x="50" y="1019" fill="#e0def4" font-size="16" font-weight="700">Test (meter in Hz between a10 and the − rail)</text>
   <g font-size="13" fill="#e0def4">
-    <text x="50" y="700">1. Test R = 1 MΩ: about 1.4 kHz.</text>
-    <text x="50" y="722">2. Test R = 10 MΩ: about 140 Hz. Ten times the resistance, ten times slower.</text>
-    <text x="50" y="744">3. Test R removed: the ticking stops. Nothing between d10 and d11 should conduct.</text>
-    <text x="50" y="774" fill="#908caa">Design values: real parts shift them a little, and calibration takes care of that.</text>
-    <text x="50" y="796" fill="#908caa">The breadboard itself leaks at 100 MΩ and above: use it for 1-10 MΩ only. For calibration and real</text>
-    <text x="50" y="814" fill="#908caa">readings, solder the circuit per oscillator_wiring_map.svg, with pin 2 in the air.</text>
+    <text x="50" y="1045">1. Test R = 1 MΩ: about 1.4 kHz.</text>
+    <text x="50" y="1067">2. Test R = 10 MΩ: about 140 Hz. Ten times the resistance, ten times slower.</text>
+    <text x="50" y="1089">3. Test R removed: the ticking stops. Nothing between d10 and d11 should conduct.</text>
+    <text x="50" y="1119" fill="#908caa">Design values: real parts shift them a little, and calibration takes care of that.</text>
+    <text x="50" y="1141" fill="#908caa">The breadboard itself leaks at 100 MΩ and above: use it for 1-10 MΩ only. For calibration and real</text>
+    <text x="50" y="1159" fill="#908caa">readings, solder the circuit per oscillator_wiring_map.svg, with pin 2 in the air.</text>
   </g>
 </svg>
