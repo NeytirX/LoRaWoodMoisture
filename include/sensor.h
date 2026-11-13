@@ -26,16 +26,6 @@
 #include <Adafruit_ADS1X15.h>
 #endif
 
-// ESP32 internal temperature sensor (undocumented but available)
-// Pins us to the current espressif32 platform - see the platform note in
-// platformio.ini before upgrading (replacement: IDF temperature sensor driver).
-#ifdef __cplusplus
-extern "C" {
-#endif
-uint8_t temprature_sens_read(); // Returns Fahrenheit (integer)
-#ifdef __cplusplus
-}
-#endif
 
 // --- Module-level state ---
 static OneWire oneWire(ONEWIRE_PIN);
@@ -118,8 +108,7 @@ inline bool sensor_has_ads1115() {
  * Only useful as a last-resort fallback.
  */
 inline float read_esp_temperature_celsius() {
-    float temp_f = (float)temprature_sens_read();
-    return (temp_f - 32.0f) * 5.0f / 9.0f;
+    return temperatureRead();  // Arduino core, v2 and v3: (F - 32) / 1.8
 }
 
 /**
