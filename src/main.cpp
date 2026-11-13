@@ -96,6 +96,7 @@ float last_esp_temp_c    = -100.0f;
 // Measurement quality flags: produced in the measurement phase and consumed when
 // building the payload (they cross the phase-function boundary via file scope).
 bool  last_adc_nonlinear      = false;
+uint8_t last_front_end        = FRONT_END_DIVIDER;
 bool  last_wood_temp_fallback = false;
 
 // =============================================================================
@@ -381,13 +382,29 @@ void execute_phase_measurement() {
     // --- Resistance Measurement ---
     bool adc_nonlinear = false;
     float R_ohms = read_wood_resistance_ohms(adc_nonlinear);
+    uint8_t front_end = FRONT_END_DIVIDER;
+#if USE_OSCILLATOR
+    // Divider open or compressed: the wood may be on the oscillator input instead.
+    if (adc_nonlinear) {
+        float R_osc = 0.0f;
+        if (read_oscillator_resistance_ohms(R_osc)) {
+            R_ohms = R_osc;
+            adc_nonlinear = false;
+            front_end = FRONT_END_OSCILLATOR;
+        } else {
+            front_end = FRONT_END_NONE;
+        }
+    }
+#endif
+    last_front_end = front_end;
     last_adc_nonlinear = adc_nonlinear;
     last_R_kOhms = R_ohms / 1000.0f;
     DEBUG_PRINT(F("Wood Resistance: "));
     DEBUG_PRINT(last_R_kOhms);
     DEBUG_PRINTLN(F(" kOhms"));
 
-    bool resistance_valid = is_resistance_in_valid_range(R_ohms);
+    // The divider's valid range does not apply to oscillator readings.
+    bool resistance_valid = (front_end == FRONT_END_OSCILLATOR) || is_resistance_in_valid_range(R_ohms);
 
     // --- Indicated Moisture Content ---
     WoodSpecies current_species;
@@ -455,6 +472,8 @@ bool execute_phase_build_payload() {
     // returned resistance is compressed (silent zone) and the MC is low-confidence.
     // Flagged on the ADC voltage, not the R value (see read_wood_resistance_ohms).
     lpp.addDigitalInput(LPP_CHANNEL_ADC_NONLINEAR, last_adc_nonlinear ? 1 : 0);
+    // Always sent: which front end produced the reading (FRONT_END_*).
+    lpp.addDigitalInput(LPP_CHANNEL_FRONT_END, last_front_end);
     // Raw resistance: paired with the quality flag so flagged readings can be
     // re-judged offline, and the main lever for dry-end analysis. Encoded as a
     // Generic Sensor (4-byte unsigned, integer kOhm) - NOT Analog Input, whose

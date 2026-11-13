@@ -51,6 +51,7 @@
 #define LPP_CHANNEL_ESP_TEMP         6   // temperature, C
 #define LPP_CHANNEL_TEMP_FALLBACK    7   // digital, 1 = default temp substituted
 #define LPP_CHANNEL_ADC_NONLINEAR    8   // digital, 1 = ADC past linearity knee, R compressed, MC low-confidence
+#define LPP_CHANNEL_FRONT_END        9   // digital, 0 = divider, 1 = oscillator, 2 = none in range
 
 // =============================================================================
 // CAYENNE LPP DATA TYPE IDS (subset the sensor actually emits)

@@ -29,7 +29,7 @@
 // FIRMWARE VERSION
 // =============================================================================
 #define FIRMWARE_VERSION_MAJOR 1
-#define FIRMWARE_VERSION_MINOR 3
+#define FIRMWARE_VERSION_MINOR 4
 #define FIRMWARE_VERSION_PATCH 0
 
 // =============================================================================
@@ -72,6 +72,30 @@
 // precision-resistor ladder tunes it.
 #define EXT_ADC_COMPRESSION_LIMIT_MV 3150.0f
 
+// --- Relaxation oscillator (dry range, ~10 MOhm - 100 GOhm) ---
+// Second front end with its own probe input (docs/oscillator_schematic.svg):
+// the wood sets the period of an MCP6002 relaxation oscillator (Casans Berga
+// et al., 2019). Powered from MOISTURE_PROBE_POWER_PIN like the divider; its
+// output is timed on OSC_PIN. Read only when the divider reports open or
+// compressed (adc_nonlinear), so wetter wood never waits on it.
+#define USE_OSCILLATOR      true
+#define OSC_PIN             13       // left header position 10
+#define OSC_SETTLE_MS       250      // mid rail: 500 kOhm x 100 nF = 50 ms, x5
+#define OSC_MIN_PERIODS     2        // full periods averaged, after the discarded first edge
+#define OSC_MAX_EDGES       64       // edge buffer: fast signals stop here
+#define OSC_WINDOW_MS       1000     // keep collecting edges this long when the signal is fast
+#define OSC_TIMEOUT_MS      60000    // no steady signal by then: nothing connected or above range
+// Calibration R = OSC_CAL_A * T^OSC_CAL_B (R in Ohm, T = period in s). Defaults are
+// the design values, T = 2 ln3 * R * C with C = 330 pF; replace them with the
+// power-law fit to the bench test resistors.
+#define OSC_CAL_A           1.379e9f
+#define OSC_CAL_B           1.0f
+
+// Which front end produced the reading (LPP channel 9).
+#define FRONT_END_DIVIDER     0
+#define FRONT_END_OSCILLATOR  1
+#define FRONT_END_NONE        2      // neither in range: open circuit or above the oscillator's range
+
 #define R_PULLUP_OHMS      100000.0f  // Pull-up resistor value (Ohms). CRITICAL for accuracy.
 #define ADC_MAX_READING    4095.0f    // 12-bit ADC max (ESP32)
 #define VCC_PROBE_VOLTAGE  3.3f       // Divider top voltage (probe power pin HIGH).
@@ -105,11 +129,11 @@
 // as a Cayenne LPP Generic Sensor (4-byte unsigned, integer kOhm), so it must
 // be clamped before encoding: the open-circuit sentinel (1e12 Ohm -> 1e9 kOhm)
 // is not a measurement and would otherwise ship as an absurd number. Any value
-// >= this ceiling means "at or above range" (pair it with the adc_nonlinear
-// flag on channel 8). 65535 kOhm (~65 MOhm) sits well above the ~2 MOhm dry-end
-// limit yet stays a clean, obviously-over-range marker. TTN's built-in Cayenne
-// LPP formatter cannot decode Generic Sensor; use tools/ttn_uplink_formatter.js.
-#define LPP_RESISTANCE_MAX_KOHMS    65535.0f
+// >= this ceiling means "at or above range" (pair it with channels 8 and 9).
+// 1e8 kOhm (100 GOhm) sits above the oscillator's range and well inside the
+// 4-byte field. TTN's built-in Cayenne LPP formatter cannot decode Generic
+// Sensor; use tools/ttn_uplink_formatter.js.
+#define LPP_RESISTANCE_MAX_KOHMS    1.0e8f
 
 // =============================================================================
 // TEMPERATURE SENSING
@@ -175,6 +199,7 @@
 #define LPP_CHANNEL_ESP_TEMP        6  // ESP32 Internal Chip Temperature (C)
 #define LPP_CHANNEL_TEMP_FALLBACK   7  // Digital: 1 = no valid DS18B20 reading, MC corrected with DEFAULT_WOOD_TEMP_CELSIUS
 #define LPP_CHANNEL_ADC_NONLINEAR   8  // Digital: 1 = ADC past linearity knee/saturated, returned R compressed, MC low-confidence
+#define LPP_CHANNEL_FRONT_END       9  // Digital: FRONT_END_* (0 divider, 1 oscillator, 2 none in range)
 
 // =============================================================================
 // DOWNLINK COMMAND BYTES (for remote configuration via LoRaWAN downlink)

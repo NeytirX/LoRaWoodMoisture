@@ -19,6 +19,7 @@
 #include <Arduino.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <esp_task_wdt.h>
 #include "config.h"
 
 #if USE_EXTERNAL_ADC
@@ -322,6 +323,67 @@ inline float read_wood_resistance_ohms(bool &adc_nonlinear) {
 
     float R_wood = R_PULLUP_OHMS * (v_node_mv / (v_top_mv - v_node_mv));
     return R_wood;
+}
+#endif
+
+#if USE_OSCILLATOR
+// Rising-edge timestamps from the oscillator output, filled by the ISR.
+static volatile uint32_t osc_edge_us[OSC_MAX_EDGES];
+static volatile uint8_t osc_edge_count = 0;
+
+static void IRAM_ATTR osc_on_rising_edge() {
+    if (osc_edge_count < OSC_MAX_EDGES) {
+        osc_edge_us[osc_edge_count++] = micros();
+    }
+}
+
+/**
+ * Read wood resistance on the oscillator input by timing the rising edges of
+ * its output on OSC_PIN. The first edge after power-up is discarded; the
+ * period is the mean of the full periods after it, collected for at least
+ * OSC_WINDOW_MS (fast signals) or until OSC_MIN_PERIODS arrive (slow ones).
+ * Returns false when no steady signal arrives within OSC_TIMEOUT_MS: nothing
+ * connected to the oscillator input, or wood drier than its range.
+ *
+ * NOTE: The probe power pin must already be HIGH (it also powers the op-amp).
+ */
+inline bool read_oscillator_resistance_ohms(float &R_ohms) {
+    pinMode(OSC_PIN, INPUT);
+    delay(OSC_SETTLE_MS);
+
+    osc_edge_count = 0;
+    attachInterrupt(digitalPinToInterrupt(OSC_PIN), osc_on_rising_edge, RISING);
+    const uint32_t start_ms = millis();
+    while (millis() - start_ms < OSC_TIMEOUT_MS) {
+        uint8_t n = osc_edge_count;
+        if (n >= OSC_MAX_EDGES) break;
+        if (n >= OSC_MIN_PERIODS + 2 && millis() - start_ms >= OSC_WINDOW_MS) break;
+        esp_task_wdt_reset();  // slow (dry) signals take tens of seconds
+        delay(10);
+    }
+    detachInterrupt(digitalPinToInterrupt(OSC_PIN));
+
+    const uint8_t n = osc_edge_count;
+    if (n < OSC_MIN_PERIODS + 2) {
+        Serial.print(F("[Sensor] Oscillator: no steady signal within "));
+        Serial.print(OSC_TIMEOUT_MS / 1000);
+        Serial.print(F(" s ("));
+        Serial.print(n);
+        Serial.println(F(" edges) - nothing connected or above range"));
+        R_ohms = 1.0e12f;
+        return false;
+    }
+
+    const float period_s = (float)(osc_edge_us[n - 1] - osc_edge_us[1]) / 1.0e6f / (float)(n - 2);
+    R_ohms = OSC_CAL_A * powf(period_s, OSC_CAL_B);
+    Serial.print(F("[Sensor] Oscillator: period "));
+    Serial.print(period_s * 1000.0f, 3);
+    Serial.print(F(" ms over "));
+    Serial.print(n - 2);
+    Serial.print(F(" periods -> "));
+    Serial.print(R_ohms / 1.0e6f, 3);
+    Serial.println(F(" MOhm"));
+    return true;
 }
 #endif
 

@@ -18,7 +18,8 @@ var CHANNEL_KEYS = {
   5: "battery_v",
   6: "esp_temp_c",
   7: "temp_fallback",
-  8: "adc_nonlinear"
+  8: "adc_nonlinear",
+  9: "front_end"
 };
 
 function readInt16(b, i) {

@@ -153,6 +153,7 @@ static const char *channel_key(uint8_t channel) {
         case LPP_CHANNEL_ESP_TEMP:        return "esp_temp_c";
         case LPP_CHANNEL_TEMP_FALLBACK:   return "temp_fallback";
         case LPP_CHANNEL_ADC_NONLINEAR:   return "adc_nonlinear";
+        case LPP_CHANNEL_FRONT_END:       return "front_end";
         default:                          return nullptr;
     }
 }
