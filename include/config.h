@@ -30,7 +30,7 @@
 // =============================================================================
 #define FIRMWARE_VERSION_MAJOR 1
 #define FIRMWARE_VERSION_MINOR 4
-#define FIRMWARE_VERSION_PATCH 0
+#define FIRMWARE_VERSION_PATCH 1
 
 // =============================================================================
 // POWER MANAGEMENT (AXP192 on T-Beam v1.1, AXP2101 on v1.2 - auto-detected)
@@ -84,7 +84,9 @@
 #define OSC_MIN_PERIODS     2        // full periods averaged, after the discarded first edge
 #define OSC_MAX_EDGES       64       // edge buffer: fast signals stop here
 #define OSC_WINDOW_MS       1000     // keep collecting edges this long when the signal is fast
-#define OSC_TIMEOUT_MS      60000    // no steady signal by then: nothing connected or above range
+#define OSC_TIMEOUT_MS      180000   // no steady signal by then: nothing connected or above range.
+                                     // Beech at 8% MC (~29 GOhm) ticks every ~21 s and needs
+                                     // 4 edges, up to ~85 s.
 // Calibration R = OSC_CAL_A * T^OSC_CAL_B (R in Ohm, T = period in s). Defaults are
 // the design values, T = 2 ln3 * R * C with C = 330 pF; replace them with the
 // power-law fit to the bench test resistors.
