@@ -688,6 +688,22 @@ uint32_t calculate_sleep_interval() {
     }
     #endif
 
+    // TTN fair use: one uplink per wake, so the interval has to cover the last
+    // uplink's airtime within the daily budget. Applied after the battery
+    // multipliers and to downlink-set intervals alike. RadioLib's own duty-cycle
+    // limiter cannot do this: its timestamps are millis() and die in deep sleep.
+    if (node) {
+        uint32_t fair_use_s = (uint32_t)(((uint64_t)node->getLastToA() * 86400UL
+                              + FAIR_USE_AIRTIME_MS_PER_DAY - 1) / FAIR_USE_AIRTIME_MS_PER_DAY);
+        if (fair_use_s > interval) {
+            DEBUG_PRINT(F("[Sleep] Fair use: last ToA "));
+            DEBUG_PRINT((uint32_t)node->getLastToA());
+            DEBUG_PRINT(F(" ms, interval raised to "));
+            DEBUG_PRINTLN(fair_use_s);
+            interval = fair_use_s;
+        }
+    }
+
     return interval;
 }
 
