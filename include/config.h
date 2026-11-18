@@ -144,9 +144,10 @@
 #define NORMAL_SEND_INTERVAL_SECONDS   (60 * 60)  // 60 minutes
 // #define ALERT_SEND_INTERVAL_SECONDS (15 * 60)  // Alternative shorter interval
 // TTN Fair Use Policy: at most 30 s of uplink airtime per device per day.
-// calculate_sleep_interval() never sleeps less than last ToA * 86400 / this,
-// so the interval stretches only at high SF (20 B payload at SF12: ~87 min).
-#define FAIR_USE_AIRTIME_MS_PER_DAY    30000UL
+// The budget here is half of that, for margin. calculate_sleep_interval()
+// never sleeps less than last ToA * 86400 / this, so the interval stretches
+// only at high SF (20 B payload: ~95 min at SF11, ~174 min at SF12).
+#define FAIR_USE_AIRTIME_MS_PER_DAY    15000UL
 
 // =============================================================================
 // BATTERY-AWARE SLEEP
