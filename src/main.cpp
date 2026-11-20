@@ -313,24 +313,36 @@ void execute_phase_radio_and_join() {
     //   to internal buffers. setBufferNonces()/setBufferSession() take a single pointer.
     //   Buffer sizes are RADIOLIB_LORAWAN_NONCES_BUF_SIZE and RADIOLIB_LORAWAN_SESSION_BUF_SIZE.
 
+    // beginOTAA() must come first: it calls clearNonces(), which zeroes DevNonce
+    // and the key checksum, and setBufferNonces() rejects a buffer whose key
+    // checksum does not match. Restoring before it silently restarted DevNonce
+    // at 0 on every boot.
+    node->beginOTAA(joinEUI, devEUI, nwkKey, appKey);
+
     // Load nonces from NVS (survives power loss)
     uint8_t noncesTemp[RADIOLIB_LORAWAN_NONCES_BUF_SIZE] = {0};
     size_t noncesLen = session_load_nonces(noncesTemp, sizeof(noncesTemp));
     if (noncesLen > 0) {
-        node->setBufferNonces(noncesTemp);
+        int16_t nState = node->setBufferNonces(noncesTemp);
+        if (nState != RADIOLIB_ERR_NONE) {
+            DEBUG_PRINT(F("[Session] RadioLib rejected saved nonces, code: "));
+            DEBUG_PRINTLN(nState);
+        }
     }
 
     // Load session from RTC (survives deep sleep only)
     uint8_t sessionTemp[RADIOLIB_LORAWAN_SESSION_BUF_SIZE] = {0};
     size_t sessionLen = 0;
     if (session_restore_rtc(sessionTemp, sizeof(sessionTemp), sessionLen)) {
-        node->setBufferSession(sessionTemp);
+        int16_t sState = node->setBufferSession(sessionTemp);
+        if (sState != RADIOLIB_ERR_NONE) {
+            DEBUG_PRINT(F("[Session] RadioLib rejected saved session, code: "));
+            DEBUG_PRINTLN(sState);
+        }
     }
 
     // --- Attempt OTAA activation (join or restore) ---
     DEBUG_PRINTLN(F("[LoRaWAN] Activating OTAA..."));
-    node->beginOTAA(joinEUI, devEUI, nwkKey, appKey);
-
     state = node->activateOTAA();
 
     if (state == RADIOLIB_LORAWAN_SESSION_RESTORED) {
@@ -356,6 +368,11 @@ void execute_phase_radio_and_join() {
         uint8_t* noncesPtr = node->getBufferNonces();
         if (noncesPtr != nullptr) {
             session_save_nonces(noncesPtr, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+            // RadioLib stores the field little-endian; this is the DevNonce the
+            // next JoinRequest will carry, so it must rise across wakes.
+            DEBUG_PRINT(F("[LoRaWAN] Next DevNonce: "));
+            DEBUG_PRINTLN((uint16_t)(noncesPtr[RADIOLIB_LORAWAN_NONCES_DEV_NONCE]
+                          | (noncesPtr[RADIOLIB_LORAWAN_NONCES_DEV_NONCE + 1] << 8)));
         }
 
         if (join_retry_count >= LORAWAN_JOIN_MAX_RETRIES) {
