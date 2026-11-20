@@ -350,6 +350,14 @@ void execute_phase_radio_and_join() {
         DEBUG_PRINTLN(state);
         join_retry_count++;
 
+        // A sent JoinRequest advanced DevNonce even though no JoinAccept came
+        // back. Save it before deep sleep wipes RAM, or every retry resends the
+        // same DevNonce and the network server rejects them all.
+        uint8_t* noncesPtr = node->getBufferNonces();
+        if (noncesPtr != nullptr) {
+            session_save_nonces(noncesPtr, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+        }
+
         if (join_retry_count >= LORAWAN_JOIN_MAX_RETRIES) {
             DEBUG_PRINTLN(F("[LoRaWAN] Max join retries reached. Extended sleep."));
             join_retry_count = 0;  // Reset for next cycle

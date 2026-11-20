@@ -120,19 +120,16 @@ inline bool session_restore_rtc(uint8_t* buf, size_t maxLen, size_t& outLen) {
 // =============================================================================
 
 /**
- * Invalidate both RTC session and NVS nonces.
+ * Invalidate the RTC session so the next activation joins fresh.
  * Call on cold boot, force-rejoin downlink, or detected session corruption.
+ * NVS nonces are kept on purpose: the network server rejects any DevNonce it
+ * has seen, and RadioLib restarts at DevNonce 0 without the saved buffer, so
+ * clearing them would make every join after a cold boot reuse a nonce.
  */
 inline void session_invalidate() {
     rtc_session_valid = false;
     memset(rtc_session_buf, 0, sizeof(rtc_session_buf));
-
-    Preferences prefs;
-    if (prefs.begin(NVS_NAMESPACE, false)) {
-        prefs.remove(NVS_KEY_NONCES);
-        prefs.end();
-    }
-    Serial.println(F("[Session] Session invalidated (RTC + NVS cleared)."));
+    Serial.println(F("[Session] Session invalidated (RTC cleared, nonces kept)."));
 }
 
 #endif // SESSION_MANAGER_H

@@ -204,11 +204,11 @@ RadioLib uses two internal buffers:
 - `node.setBufferSession(const uint8_t*)` → restores session before `activateOTAA()`
 
 **Operations:**
-- `session_save_nonces()` — Called after successful OTAA join and after each uplink
+- `session_save_nonces()` — Called after every OTAA join attempt, failed or not, and after each uplink
 - `session_load_nonces()` — Called on every boot before `activateOTAA()`
 - `session_save_rtc()` — Called after every uplink (frame counters change)
 - `session_restore_rtc()` — Called on warm boot before `activateOTAA()`
-- `session_invalidate()` — Called on force-rejoin downlink or cold boot
+- `session_invalidate()` — Called on force-rejoin downlink or cold boot; drops the RTC session only, never the NVS nonces
 
 **Validity Tracking:**
 - A plain `RTC_DATA_ATTR bool rtc_session_valid` flag marks whether the RTC session buffer holds restorable data (RTC RAM zeroes on power-on reset, so the flag starts false on cold boot)
