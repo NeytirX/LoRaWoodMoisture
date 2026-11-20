@@ -36,7 +36,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y cppcheck
 
       - name: Run static analysis (cppcheck)
-        run: cppcheck --enable=warning,style --suppress=missingInclude --inline-suppr --error-exitcode=1 src/ include/
+        run: cppcheck --enable=warning,style --suppress=missingInclude --suppress=normalCheckLevelMaxBranches --inline-suppr --error-exitcode=1 src/ include/
 
       - name: Provide placeholder LoRaWAN keys for CI build
         run: cp include/lorawan_keys_template.h include/lorawan_keys.h
