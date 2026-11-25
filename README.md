@@ -17,7 +17,7 @@ This firmware reads the resistive probe through a 100k voltage divider into a 16
 - **Remote Configuration:** Downlink commands for adjusting measurement interval, wood species, LoRaWAN region, and forcing rejoin (a TX power command byte exists but is reserved — see Downlink Commands)
 - **Battery-Aware Power Management:** AXP192/AXP2101 PMIC integration (auto-detected, T-Beam v1.1/v1.2) with critical voltage protection and adaptive sleep intervals (2x/4x multiplier when battery is low/critical); both the critical-battery abort and the sleep multipliers are skipped while USB power is present, including when no battery is detected at all
 - **Hardware Watchdog:** ESP32 Task Watchdog Timer prevents firmware hangs (120s timeout)
-- **Ultra-Low Power Design:** Deep sleep operation with configurable intervals (default: 1 hour)
+- **Ultra-Low Power Design:** Deep sleep operation with configurable intervals (default: 1 hour, stretched to ~3.2 h at the fixed SF12 by the fair-use floor; see Uplink Data Rate)
 
 ### Thesis Context
 
@@ -156,6 +156,22 @@ I2C (PMIC + ADS1115 external ADC):
 | `BATTERY_ABSENT_THRESHOLD_V` | 0.5 | Below this + USB present = no battery connected |
 | `WATCHDOG_TIMEOUT_SECONDS` | 120 | Watchdog timer (seconds) |
 
+### Uplink Data Rate
+
+Uplinks go out at a fixed **SF12** (EU868 DR0) with ADR off, since 2026-11-25. From the balcony test site, SF9 uplinks on the 867.x channels never reached TTN, while SF12 uplinks arrived down to SNR -18 dB; SF12 tolerates about 7.5 dB weaker signals than SF9. Details: `docs/ai/issues.md` #25.
+
+The cost is airtime. An SF12 uplink takes ~2 s on air (SF9: ~0.27 s), and the fair-use floor (`FAIR_USE_AIRTIME_MS_PER_DAY`, 15 s a day, half of TTN's 30 s) stretches the interval from 1 hour to about **3.2 hours**, so roughly 7 to 8 readings a day instead of 24.
+
+To change it later, edit `include/config.h` and reflash:
+
+| Setting | Now | What it does |
+|---------|-----|--------------|
+| `LORAWAN_UPLINK_DATARATE` | `0` (SF12) | Uplink data rate. `3` (SF9) restores hourly readings once the site has a better link or its own gateway; `1` (SF11) is a middle step at ~1.6 h |
+| `FAIR_USE_AIRTIME_MS_PER_DAY` | `15000` | Daily airtime budget that sets the interval floor; TTN allows 30000 |
+| `NORMAL_SEND_INTERVAL_SECONDS` | `3600` | Interval used when the floor is shorter (SF9 and faster) |
+
+Check the `[TX] DR ...` serial line after a change: it prints the data rate, channel and power RadioLib actually used.
+
 Each wake cycle sends exactly one uplink (single-TX-per-cycle design): the firmware performs a single `sendReceive()` with no retry loop. A failed uplink is intentionally dropped and the device sleeps until the next measurement; for an hourly cadence a missed reading is acceptable, and skipping retries saves the battery and air-time they would cost.
 
 ### Downlink Commands (Remote Configuration)
@@ -167,7 +183,7 @@ Send downlink messages on any port to reconfigure the device:
 | Set Interval | `0x01 HH LL` | Set measurement interval (HH:LL = minutes, big-endian uint16) |
 | Set Species | `0x02 XX` | Set wood species index (XX = 0 to NUM_WOOD_SPECIES-1) |
 | Force Rejoin | `0x03` | Force a fresh OTAA join on next wake |
-| Set TX Power | `0x04 XX` | Reserved — parsed but not applied; ADR manages TX power (issue: implement or keep reserved) |
+| Set TX Power | `0x04 XX` | Reserved: parsed but not applied; with ADR off, TX power stays at RadioLib's default (16 dBm on EU868) |
 | Set Region | `0x05 XX` | Set LoRaWAN region (XX = 0: EU868, 1: EU433). Persisted in NVS, forces rejoin |
 
 ### Adding Wood Species
