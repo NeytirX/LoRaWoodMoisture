@@ -563,14 +563,26 @@ void execute_phase_uplink() {
         // sendReceive: sends uplink on fPort 1, receives any downlink
         // Returns: RADIOLIB_ERR_NONE (no downlink), >0 (downlink fPort),
         //          or negative error code
+        LoRaWANEvent_t evUp = {};             // filled by RadioLib with what it sent
         int txResult = node->sendReceive(
             lpp.getBuffer(), lpp.getSize(),  // uplink data
             1,                                // fPort = 1
-            downlinkPayload, &downlinkLen     // downlink buffer
+            downlinkPayload, &downlinkLen,    // downlink buffer
+            false, &evUp                      // unconfirmed; report the uplink
         );
 
         if (txResult >= 0) {
             DEBUG_PRINTLN(F("[TX] Uplink successful!"));
+            // RadioLib's own record of the uplink, to compare with what the
+            // network server saw (or did not see) for the same FCnt.
+            DEBUG_PRINT(F("[TX] DR "));
+            DEBUG_PRINT(evUp.datarate);
+            DEBUG_PRINT(F(", "));
+            DEBUG_PRINT(String(evUp.freq, 3));
+            DEBUG_PRINT(F(" MHz, "));
+            DEBUG_PRINT(evUp.power);
+            DEBUG_PRINT(F(" dBm, FCnt "));
+            DEBUG_PRINTLN(evUp.fCnt);
 
             // Check for downlink
             if (txResult > 0 && downlinkLen > 0) {
