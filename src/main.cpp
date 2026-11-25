@@ -563,6 +563,11 @@ void execute_phase_uplink() {
         // sendReceive: sends uplink on fPort 1, receives any downlink
         // Returns: RADIOLIB_ERR_NONE (no downlink), >0 (downlink fPort),
         //          or negative error code
+        // Fixed data rate, ADR off (LORAWAN_UPLINK_DATARATE in config.h). Set
+        // before every uplink so a restored session cannot carry another rate.
+        node->setADR(false);
+        node->setDatarate(LORAWAN_UPLINK_DATARATE);
+
         LoRaWANEvent_t evUp = {};             // filled by RadioLib with what it sent
         int txResult = node->sendReceive(
             lpp.getBuffer(), lpp.getSize(),  // uplink data

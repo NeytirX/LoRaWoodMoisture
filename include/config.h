@@ -172,8 +172,16 @@
 // TTN Fair Use Policy: at most 30 s of uplink airtime per device per day.
 // The budget here is half of that, for margin. calculate_sleep_interval()
 // never sleeps less than last ToA * 86400 / this, so the interval stretches
-// only at high SF (20 B payload: ~95 min at SF11, ~174 min at SF12).
+// only at high SF (23 B payload at SF12, the fixed rate below: ~3.2 h).
 #define FAIR_USE_AIRTIME_MS_PER_DAY    15000UL
+
+// Uplink data rate, fixed, with ADR off. EU868: 0 = SF12, 1 = SF11, 2 = SF10,
+// 3 = SF9, 4 = SF8, 5 = SF7 (all 125 kHz). SF12 since 2026-11-25: from the
+// balcony test site SF9 uplinks on the 867.x channels were lost, SF12 ones
+// arrived down to SNR -18 dB (docs/ai/issues.md #25). The cost is airtime: the
+// fair-use floor above stretches the interval to ~3.2 h. Raise it (3 = SF9
+// for hourly) once the site has a better link or its own gateway.
+#define LORAWAN_UPLINK_DATARATE        0
 
 // =============================================================================
 // BATTERY-AWARE SLEEP
